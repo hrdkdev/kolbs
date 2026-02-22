@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Export - Kolb's Learning Cycle{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-lg">Export</h1>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Export All Entries</h2>
+        </div>
+        <p class="mb-md">
+            Download all your entries as a ZIP file containing Markdown files and a JSON dump.
+        </p>
+        <a href="{{ url_for('export_all_zip') }}" class="btn btn-primary">Download ZIP</a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Export Single Entry</h2>
+        </div>
+        <p class="mb-md">Select an entry to export:</p>
+        
+        {% if entries %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Entry</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Export</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('view_entry', entry_id=entry.id) }}">
+                            {{ entry.title or 'Untitled' }}
+                        </a>
+                    </td>
+                    <td>{{ entry.occurred_at[:10] if entry.occurred_at else '-' }}</td>
+                    <td>
+                        {% if entry.is_complete %}
+                        <span class="chip chip-complete">Complete</span>
+                        {% else %}
+                        <span class="chip chip-draft">Draft</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="{{ url_for('export_entry_markdown', entry_id=entry.id) }}" 
+                               class="btn btn-ghost btn-sm">Markdown</a>
+                            <a href="{{ url_for('export_entry_json', entry_id=entry.id) }}" 
+                               class="btn btn-ghost btn-sm">JSON</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">No entries to export.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Entries - Kolb's Learning Cycle{% endblock %}
+
+{% block header_class %} wide{% endblock %}
+
+{% block content %}
+<div class="container container-wide">
+    <div class="flex-between mb-lg">
+        <h1>Entries</h1>
+        <div class="btn-group">
+            <a href="{{ url_for('new_entry', quick=1) }}" class="btn btn-primary">Quick Capture</a>
+            <a href="{{ url_for('new_entry') }}" class="btn btn-secondary">New Kolb</a>
+        </div>
+    </div>
+
+    <form method="GET" class="filters-bar">
+        <div class="search-input">
+            <input type="text" name="search" class="form-input" 
+                   placeholder="Search entries..." value="{{ filters.search }}" id="search-input">
+        </div>
+        
+        <div class="filter-group">
+            <label>Status:</label>
+            <select name="status">
+                <option value="">All</option>
+                <option value="draft" {% if filters.status == 'draft' %}selected{% endif %}>Draft</option>
+                <option value="complete" {% if filters.status == 'complete' %}selected{% endif %}>Complete</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Domain:</label>
+            <select name="domain">
+                <option value="">All</option>
+                {% for d in domains %}
+                <option value="{{ d }}" {% if filters.domain == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Valence:</label>
+            <select name="valence">
+                <option value="">All</option>
+                <option value="positive" {% if filters.valence == 'positive' %}selected{% endif %}>Positive</option>
+                <option value="neutral" {% if filters.valence == 'neutral' %}selected{% endif %}>Neutral</option>
+                <option value="negative" {% if filters.valence == 'negative' %}selected{% endif %}>Negative</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Tag:</label>
+            <select name="tag">
+                <option value="">All</option>
+                {% for t in tags %}
+                <option value="{{ t.name }}" {% if filters.tag == t.name %}selected{% endif %}>{{ t.name }} ({{ t.usage_count }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>From:</label>
+            <input type="date" name="date_from" value="{{ filters.date_from }}">
+        </div>
+
+        <div class="filter-group">
+            <label>To:</label>
+            <input type="date" name="date_to" value="{{ filters.date_to }}">
+        </div>
+
+        <div class="filter-group">
+            <label>Sort:</label>
+            <select name="sort">
+                <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest</option>
+                <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest</option>
+                <option value="last_edited" {% if sort == 'last_edited' %}selected{% endif %}>Last Edited</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+        <a href="{{ url_for('list_entries') }}" class="btn btn-ghost btn-sm">Clear</a>
+    </form>
+
+    <p class="text-sm text-muted mb-md">{{ total }} entries found</p>
+
+    {% if entries %}
+    <div class="entry-list">
+        {% for entry in entries %}
+        <div class="entry-item">
+            <div class="entry-item-main">
+                <div class="entry-item-title">
+                    <span class="valence-indicator valence-{{ entry.valence }}"></span>
+                    <a href="{{ url_for('view_entry', entry_id=entry.id) }}">
+                        {{ entry.title or 'Untitled' }}
+                    </a>
+                    {% if entry.is_complete %}
+                    <span class="chip chip-complete">Complete</span>
+                    {% else %}
+                    <span class="chip chip-draft">Draft</span>
+                    {% endif %}
+                </div>
+                <div class="entry-item-meta">
+                    <span>{{ entry.occurred_at[:10] if entry.occurred_at else 'No date' }}</span>
+                    {% if entry.domain %}
+                    <span>{{ entry.domain }}</span>
+                    {% endif %}
+                    {% if entry.experiment_count %}
+                    <span>{{ entry.experiment_count }} experiment{{ 's' if entry.experiment_count != 1 else '' }}</span>
+                    {% endif %}
+                </div>
+                {% if entry.experience_text %}
+                <p class="text-sm text-secondary mt-sm" style="max-width: 600px;">
+                    {{ entry.experience_text[:150] }}{% if entry.experience_text|length > 150 %}...{% endif %}
+                </p>
+                {% endif %}
+                {% if entry.tags %}
+                <div class="entry-item-tags">
+                    {% for tag in entry.tags %}
+                    <a href="{{ url_for('list_entries', tag=tag) }}" class="tag-item">{{ tag }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="entry-item-progress">
+                <div class="entry-item-progress-label">{{ entry.completion }}%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill {% if entry.completion == 100 %}complete{% endif %}" 
+                         style="width: {{ entry.completion }}%"></div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('list_entries', page=page-1, search=filters.search, domain=filters.domain, valence=filters.valence, status=filters.status, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">&larr; Prev</a>
+        {% endif %}
+        
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <span class="current">{{ p }}</span>
+            {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+            <a href="{{ url_for('list_entries', page=p, search=filters.search, domain=filters.domain, valence=filters.valence, status=filters.status, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">{{ p }}</a>
+            {% elif p == 4 or p == total_pages - 2 %}
+            <span>...</span>
+            {% endif %}
+        {% endfor %}
+        
+        {% if page < total_pages %}
+        <a href="{{ url_for('list_entries', page=page+1, search=filters.search, domain=filters.domain, valence=filters.valence, status=filters.status, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">Next &rarr;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">&#128221;</div>
+        <div class="empty-state-title">No entries found</div>
+        <div class="empty-state-text">
+            {% if filters.search or filters.domain or filters.tag %}
+            Try adjusting your filters or search terms.
+            {% else %}
+            Start by creating your first Kolb cycle entry.
+            {% endif %}
+        </div>
+        <a href="{{ url_for('new_entry') }}" class="btn btn-primary">Create Entry</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

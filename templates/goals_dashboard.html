@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Goals - High-Propensity Goals{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-lg">
+        <h1>High-Propensity Goals</h1>
+        {% if stats.can_create %}
+        <a href="{{ url_for('new_goal') }}" class="btn btn-primary">New Goal</a>
+        {% else %}
+        <span class="text-muted text-sm">3/3 active goals (archive one to add more)</span>
+        {% endif %}
+    </div>
+
+    <!-- Stats Row -->
+    <div class="goals-stats mb-lg">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.active_count }}/3</div>
+            <div class="stat-label">Active Goals</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.logs_this_week }}</div>
+            <div class="stat-label">Logs This Week</div>
+        </div>
+        {% if stats.archived_count > 0 %}
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.archived_count }}</div>
+            <div class="stat-label">Archived</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Active Goals -->
+    {% if goals %}
+    <div class="goals-grid">
+        {% for goal in goals %}
+        <div class="goal-card">
+            <div class="goal-card-header">
+                <h3 class="goal-card-title">
+                    <a href="{{ url_for('view_goal', goal_id=goal.id) }}">{{ goal.title }}</a>
+                </h3>
+                {% if goal.target_date %}
+                <span class="text-sm text-muted">Target: {{ goal.target_date }}</span>
+                {% endif %}
+            </div>
+            
+            {% if goal.outcome_target %}
+            <p class="goal-card-outcome text-sm text-secondary">{{ goal.outcome_target[:100] }}{% if goal.outcome_target|length > 100 %}...{% endif %}</p>
+            {% endif %}
+
+            <div class="goal-card-stats">
+                <div class="goal-stat">
+                    <span class="goal-stat-value {% if goal.streak > 0 %}text-success{% endif %}">{{ goal.streak }}</span>
+                    <span class="goal-stat-label">day streak</span>
+                </div>
+                <div class="goal-stat">
+                    <span class="goal-stat-value">{{ goal.completion_rate }}%</span>
+                    <span class="goal-stat-label">completion</span>
+                </div>
+                <div class="goal-stat">
+                    <span class="goal-stat-value">{{ goal.metric_count }}</span>
+                    <span class="goal-stat-label">metrics</span>
+                </div>
+            </div>
+
+            <div class="goal-card-actions">
+                <a href="{{ url_for('goal_daily_log', goal_id=goal.id) }}" class="btn btn-primary btn-sm">Log Today</a>
+                <a href="{{ url_for('view_goal', goal_id=goal.id) }}" class="btn btn-ghost btn-sm">View</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-title">No active goals</div>
+        <div class="empty-state-text">Create your first high-propensity goal to start tracking performance.</div>
+        <a href="{{ url_for('new_goal') }}" class="btn btn-primary">Create Goal</a>
+    </div>
+    {% endif %}
+
+    <!-- Archived Goals -->
+    {% if archived_goals %}
+    <div class="mt-lg">
+        <details class="archived-section">
+            <summary class="text-secondary">
+                Archived Goals ({{ archived_goals|length }})
+            </summary>
+            <div class="archived-goals-list mt-md">
+                {% for goal in archived_goals %}
+                <div class="archived-goal-item">
+                    <span>{{ goal.title }}</span>
+                    <form action="{{ url_for('unarchive_goal_route', goal_id=goal.id) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-ghost btn-sm">Restore</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

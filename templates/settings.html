@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Kolb's Learning Cycle{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-lg">Settings</h1>
+
+    <form method="POST" class="card">
+        <div class="card-header">
+            <h2 class="card-title">Preferences</h2>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Preferred Mode</label>
+            <select name="preferred_mode" class="form-select" style="max-width: 300px;">
+                <option value="wizard" {% if settings.preferred_mode == 'wizard' %}selected{% endif %}>
+                    Wizard (step-by-step)
+                </option>
+                <option value="power" {% if settings.preferred_mode == 'power' %}selected{% endif %}>
+                    Power (all steps on one page)
+                </option>
+            </select>
+            <div class="form-hint">Which mode to use when creating/editing entries</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Default Domain</label>
+            <input type="text" name="default_domain" class="form-input" style="max-width: 300px;"
+                   value="{{ settings.default_domain or '' }}" list="domain-list"
+                   placeholder="e.g., work, study, health...">
+            <datalist id="domain-list">
+                {% for d in domains %}
+                <option value="{{ d }}">
+                {% endfor %}
+            </datalist>
+            <div class="form-hint">Pre-fill this domain when creating new entries</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-check">
+                <input type="checkbox" name="autosave_enabled" value="true"
+                       {% if settings.autosave_enabled == 'true' %}checked{% endif %}>
+                <span>Enable autosave</span>
+            </label>
+            <div class="form-hint">Automatically save changes while editing (requires JavaScript)</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Font Size</label>
+            <select name="font_size" class="form-select" style="max-width: 300px;">
+                <option value="small" {% if settings.font_size == 'small' %}selected{% endif %}>Small</option>
+                <option value="medium" {% if settings.font_size == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="large" {% if settings.font_size == 'large' %}selected{% endif %}>Large</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </form>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Database</h2>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Database Location</label>
+            <code style="display: block; padding: var(--space-sm); background: var(--bg-tertiary); border-radius: var(--radius);">
+                {{ db_path }}
+            </code>
+            <div class="form-hint">Your data is stored locally in this SQLite file</div>
+        </div>
+
+        <form method="POST" action="{{ url_for('create_backup') }}" class="mt-md">
+            <button type="submit" class="btn btn-secondary">Create Backup Copy</button>
+            <span class="text-sm text-muted ml-md">Creates a timestamped copy next to the database file</span>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Sample Data</h2>
+        </div>
+        <p class="mb-md">Create sample entries for testing the app.</p>
+        <form method="POST" action="{{ url_for('seed_data') }}">
+            <button type="submit" class="btn btn-secondary">Create Sample Data</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Keyboard Shortcuts</h2>
+        </div>
+        <table class="table">
+            <tbody>
+                <tr>
+                    <td><span class="kbd">Ctrl</span> + <span class="kbd">S</span></td>
+                    <td>Save current entry</td>
+                </tr>
+                <tr>
+                    <td><span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></td>
+                    <td>Go to next step (wizard mode)</td>
+                </tr>
+                <tr>
+                    <td><span class="kbd">/</span></td>
+                    <td>Focus search input</td>
+                </tr>
+                <tr>
+                    <td><span class="kbd">Esc</span></td>
+                    <td>Exit focus mode / close modals</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

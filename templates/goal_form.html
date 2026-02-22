@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}New Goal{% else %}Edit Goal{% endif %} - Goals{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="mb-lg">
+        <a href="{{ url_for('goals_dashboard') }}" class="text-sm text-secondary">&larr; Back to Goals</a>
+    </div>
+
+    <h1 class="mb-lg">{% if is_new %}Create New Goal{% else %}Edit Goal{% endif %}</h1>
+
+    <form action="{% if is_new %}{{ url_for('create_goal_form') }}{% else %}{{ url_for('update_goal_form', goal_id=goal.id) }}{% endif %}" method="POST" class="card">
+        
+        <!-- Outcome Section -->
+        <div class="form-section">
+            <h2 class="form-section-title">Outcome (SMART Target)</h2>
+            <p class="text-sm text-muted mb-md">Define what success looks like. Make it Specific, Measurable, Achievable, Relevant, and Time-bound.</p>
+
+            <div class="form-group">
+                <label for="title" class="form-label">Goal Title</label>
+                <input type="text" id="title" name="title" class="form-input" 
+                       value="{{ goal.title if goal else '' }}" 
+                       placeholder="e.g., Master HtDF Recipe" required>
+            </div>
+
+            <div class="form-group">
+                <label for="outcome_target" class="form-label">SMART Target</label>
+                <textarea id="outcome_target" name="outcome_target" class="form-textarea"
+                          placeholder="e.g., Complete 50 HtDF problems with 90%+ accuracy by March 15, 2026">{{ goal.outcome_target if goal else '' }}</textarea>
+                <div class="form-hint">Describe the specific outcome you want to achieve.</div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="target_date" class="form-label">Target Date</label>
+                    <input type="date" id="target_date" name="target_date" class="form-input"
+                           value="{{ goal.target_date if goal else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="target_metric" class="form-label">Success Metric (optional)</label>
+                    <input type="text" id="target_metric" name="target_metric" class="form-input"
+                           value="{{ goal.target_metric if goal else '' }}"
+                           placeholder="e.g., 50 problems, 90% accuracy">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="description" class="form-label">Description (optional)</label>
+                <textarea id="description" name="description" class="form-textarea"
+                          placeholder="Additional context or notes about this goal">{{ goal.description if goal else '' }}</textarea>
+            </div>
+        </div>
+
+        {% if is_new %}
+        <!-- Performance Metrics Section (only for new goals) -->
+        <div class="form-section mt-lg">
+            <h2 class="form-section-title">Performance Metrics</h2>
+            <p class="text-sm text-muted mb-md">Define the daily process attributes you want to track. You can add more after creating the goal.</p>
+
+            <div class="form-group">
+                <label for="metrics" class="form-label">Metrics (comma-separated)</label>
+                <input type="text" id="metrics" name="metrics" class="form-input"
+                       placeholder="e.g., Focus, Consistency, Followed Recipe">
+                <div class="form-hint">Leave blank to add metrics later. Each metric will become a daily checkbox + rating.</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-actions mt-lg">
+            <button type="submit" class="btn btn-primary btn-lg">
+                {% if is_new %}Create Goal{% else %}Save Changes{% endif %}
+            </button>
+            <a href="{{ url_for('goals_dashboard') }}" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

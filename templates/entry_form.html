@@ -1,0 +1,713 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}New Entry{% else %}{{ entry.title or 'Untitled Entry' }}{% endif %} - Kolb's Learning Cycle{% endblock %}
+
+{% block body_class %}{% if request.args.get('focus') %} distraction-free{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-lg">
+        <div class="flex-center gap-md">
+            <a href="{{ url_for('index') }}" class="btn btn-ghost">&larr; Back</a>
+            <h1 class="mb-0">{% if is_new %}New Entry{% else %}Edit Entry{% endif %}</h1>
+            {% if not is_new %}
+            {% if entry.is_complete %}
+            <span class="chip chip-complete">Complete</span>
+            {% else %}
+            <span class="chip chip-draft">Draft - {{ entry.completion }}%</span>
+            {% endif %}
+            {% endif %}
+        </div>
+        <div class="flex-center gap-sm">
+            <div class="save-indicator" id="save-indicator">
+                <span id="save-status"></span>
+            </div>
+            <div class="mode-toggle">
+                <a href="?mode=wizard{% if not is_new %}&id={{ entry.id }}{% endif %}" 
+                   class="mode-toggle-btn {% if mode == 'wizard' %}active{% endif %}">Wizard</a>
+                <a href="?mode=power{% if not is_new %}&id={{ entry.id }}{% endif %}" 
+                   class="mode-toggle-btn {% if mode == 'power' %}active{% endif %}">Power</a>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleDistractionFree()">Focus Mode</button>
+        </div>
+    </div>
+
+    <form id="entry-form" method="POST" 
+          action="{% if is_new %}{{ url_for('create_entry_form') }}{% else %}{{ url_for('update_entry_form', entry_id=entry.id) }}{% endif %}">
+        
+        <input type="hidden" name="current_step" id="current_step" value="{{ entry.current_step or 1 }}">
+        
+        {% if mode == 'wizard' %}
+        <!-- Wizard Mode -->
+        {% set current = (request.args.get('step', entry.current_step or 1) | int) %}
+        
+        <div class="wizard-steps mb-lg">
+            {% for step_num, step_name in [(1, 'Experience'), (2, 'Reflection'), (3, 'Abstraction'), (4, 'Experimentation')] %}
+            <a href="?mode=wizard&step={{ step_num }}" 
+               class="wizard-step {% if step_num == current %}active{% endif %} {% if entry.get(step_name.lower() + '_text') or (step_num == 4 and entry.experiments) %}completed{% endif %}">
+                <span class="wizard-step-number">{{ step_num }}</span>
+                <span>{{ step_name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- Step 1: Experience -->
+        <div class="card {% if current != 1 %}hidden{% endif %}" id="step-1">
+            <h2>1. Experience</h2>
+            <p class="text-muted text-sm mb-lg">What happened? Describe the concrete experience.</p>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="title">Title</label>
+                    <input type="text" class="form-input" id="title" name="title" 
+                           value="{{ entry.title or '' }}" placeholder="Brief description...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="occurred_at">Date/Time</label>
+                    <input type="datetime-local" class="form-input" id="occurred_at" name="occurred_at"
+                           value="{{ (entry.occurred_at or now.isoformat())[:16] }}">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="domain">Domain</label>
+                    <input type="text" class="form-input" id="domain" name="domain" list="domain-list"
+                           value="{{ entry.domain or settings.default_domain or '' }}" 
+                           placeholder="e.g., work, study, health...">
+                    <datalist id="domain-list">
+                        {% for d in domains %}
+                        <option value="{{ d }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valence</label>
+                    <div class="form-inline" style="height: 42px;">
+                        <label class="form-check">
+                            <input type="radio" name="valence" value="positive" 
+                                   {% if entry.valence == 'positive' %}checked{% endif %}>
+                            <span class="valence-indicator valence-positive"></span> Positive
+                        </label>
+                        <label class="form-check">
+                            <input type="radio" name="valence" value="neutral" 
+                                   {% if entry.valence == 'neutral' or not entry.valence %}checked{% endif %}>
+                            <span class="valence-indicator valence-neutral"></span> Neutral
+                        </label>
+                        <label class="form-check">
+                            <input type="radio" name="valence" value="negative" 
+                                   {% if entry.valence == 'negative' %}checked{% endif %}>
+                            <span class="valence-indicator valence-negative"></span> Negative
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="experience_text">Experience (1-5 sentences)</label>
+                <textarea class="form-textarea large" id="experience_text" name="experience_text" 
+                          placeholder="Describe what happened...">{{ entry.experience_text or '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="tags">Tags</label>
+                <input type="text" class="form-input" id="tags" name="tags"
+                       value="{% if entry.tags %}{% for t in entry.tags %}{{ t.name if t is mapping else t }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}"
+                       placeholder="Comma-separated tags...">
+                <div class="form-hint">Separate tags with commas</div>
+            </div>
+
+            {% if available_experiments %}
+            <div class="form-group">
+                <label class="form-check">
+                    <input type="checkbox" id="toggle-reflect-exp" 
+                           {% if entry.reflects_on_experiment_id %}checked{% endif %}>
+                    <span>This reflects on a previous experiment</span>
+                </label>
+            </div>
+            <div class="form-group {% if not entry.reflects_on_experiment_id %}hidden{% endif %}" id="reflect-exp-group">
+                <label class="form-label" for="reflects_on_experiment_id">Which experiment?</label>
+                <select class="form-select" id="reflects_on_experiment_id" name="reflects_on_experiment_id">
+                    <option value="">Select an experiment...</option>
+                    {% for exp in available_experiments %}
+                    <option value="{{ exp.id }}" 
+                            {% if entry.reflects_on_experiment_id == exp.id %}selected{% endif %}>
+                        {{ exp.text[:60] }}... (from: {{ exp.entry_title }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Step 2: Reflection -->
+        <div class="card {% if current != 2 %}hidden{% endif %}" id="step-2">
+            <h2>2. Reflection</h2>
+            <p class="text-muted text-sm mb-lg">Look back at the experience. How did you observe it?</p>
+            
+            <p class="text-sm mb-md">Expand any prompts that help you reflect:</p>
+            
+            <div class="prompt-block" data-prompt="feeling">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>How did you feel?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="feeling" placeholder="Describe your emotions...">{{ entry.reflection_prompts.feeling or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="when">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>When did you feel this way?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="when" placeholder="At what moments...">{{ entry.reflection_prompts.when or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="struggles">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>If you struggled, at what points? Were there triggers?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="struggles" placeholder="Identify specific moments...">{{ entry.reflection_prompts.struggles or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="reaction">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>How did you react?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="reaction" placeholder="Your responses and behaviors...">{{ entry.reflection_prompts.reaction or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="others">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>How did others react?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="others" placeholder="What you observed in others...">{{ entry.reflection_prompts.others or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="factors">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>Any factors before the experience (tired, stress, etc.)?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="factors" placeholder="Pre-existing conditions...">{{ entry.reflection_prompts.factors or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="chronology">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>Chronology / step-by-step recount</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="chronology" placeholder="What happened first, then...">{{ entry.reflection_prompts.chronology or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="difficulty">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>How did you respond to difficulty?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="difficulty" placeholder="Your coping strategies...">{{ entry.reflection_prompts.difficulty or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="timeline">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>How did you feel before/during/after?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="timeline" placeholder="Emotional timeline...">{{ entry.reflection_prompts.timeline or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="form-group mt-lg">
+                <label class="form-label" for="reflection_text">Full Reflection</label>
+                <p class="form-hint mb-sm">Combine your thoughts. Use bullet points (one per line) or paragraphs.</p>
+                <textarea class="form-textarea large" id="reflection_text" name="reflection_text"
+                          placeholder="- First observation&#10;- Second thought&#10;- Another reflection...">{{ entry.reflection_text or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- Step 3: Abstraction -->
+        <div class="card {% if current != 3 %}hidden{% endif %}" id="step-3">
+            <h2>3. Abstraction</h2>
+            <p class="text-muted text-sm mb-lg">What patterns or principles can you draw? Think beyond this specific case.</p>
+            
+            <p class="text-sm mb-md">Consider these prompts:</p>
+
+            <div class="prompt-block" data-prompt="tendency">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>How do I tend to act in these situations?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="tendency" placeholder="Your typical patterns...">{{ entry.abstraction_prompts.tendency or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="approach">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>What about my approach/perspective/strategy made me prone to this error?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="approach" placeholder="Root causes in your approach...">{{ entry.abstraction_prompts.approach or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="similar">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>Do I make similar mistakes in other areas?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="similar" placeholder="Cross-domain patterns...">{{ entry.abstraction_prompts.similar or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="prompt-block" data-prompt="habits">
+                <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
+                    <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
+                    <span>What habits do I seem to have in these situations?</span>
+                </div>
+                <div class="prompt-content">
+                    <textarea class="prompt-textarea" data-prompt-name="habits" placeholder="Habitual responses...">{{ entry.abstraction_prompts.habits or '' if entry else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="form-group mt-lg">
+                <label class="form-label" for="abstraction_text">Abstract Principles</label>
+                <p class="form-hint mb-sm">Focus on generalizable patterns, not just retelling the experience.</p>
+                <textarea class="form-textarea large" id="abstraction_text" name="abstraction_text"
+                          placeholder="What general insights or principles emerge?">{{ entry.abstraction_text or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- Step 4: Experimentation -->
+        <div class="card {% if current != 4 %}hidden{% endif %}" id="step-4">
+            <h2>4. Experimentation</h2>
+            <p class="text-muted text-sm mb-lg">What will you try differently? Be specific and actionable.</p>
+            
+            <div class="form-group">
+                <label class="form-check">
+                    <input type="checkbox" name="no_experiment_needed" id="no_experiment_needed"
+                           {% if entry.no_experiment_needed %}checked{% endif %}>
+                    <span>No experiment needed for this entry</span>
+                </label>
+            </div>
+
+            <div id="experiments-section" {% if entry.no_experiment_needed %}class="hidden"{% endif %}>
+                <p class="text-sm text-muted mb-md">
+                    Experiments must be specific actions, not vague intentions like "try harder". 
+                    Include a verb and concrete behavior.
+                </p>
+                
+                {% if not is_new and entry.experiments %}
+                <h3 class="mb-md">Current Experiments</h3>
+                {% for exp in entry.experiments %}
+                <div class="experiment-item" data-exp-id="{{ exp.id }}">
+                    <div class="experiment-item-main">
+                        <div class="experiment-item-text">{{ exp.text }}</div>
+                        <div class="experiment-item-meta">
+                            <span class="chip chip-{{ exp.status }}">{{ exp.status }}</span>
+                            {% if exp.start_date %}Start: {{ exp.start_date }}{% endif %}
+                            {% if exp.review_date %}Review: {{ exp.review_date }}{% endif %}
+                        </div>
+                        {% if exp.outcome_notes %}
+                        <div class="text-sm mt-sm">Outcome: {{ exp.outcome_notes }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="editExperiment({{ exp.id }})">Edit</button>
+                        <form method="POST" action="{{ url_for('delete_experiment_form', exp_id=exp.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-ghost btn-sm text-error" onclick="return confirm('Delete this experiment?')">Delete</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <div class="card mt-md" style="background: var(--bg-tertiary);">
+                    <h4 class="mb-md">Add New Experiment</h4>
+                    {% if is_new %}
+                    <p class="text-sm text-muted mb-md">Save the entry first to add experiments.</p>
+                    {% else %}
+                    <div class="form-group">
+                        <label class="form-label" for="new_exp_text">Experiment Statement</label>
+                        <textarea class="form-textarea" id="new_exp_text" placeholder="What specific action will you take?"></textarea>
+                        <div class="form-hint" id="exp-warning"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="new_exp_status">Status</label>
+                            <select class="form-select" id="new_exp_status">
+                                <option value="planned">Planned</option>
+                                <option value="active">Active</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new_exp_start">Start Date</label>
+                            <input type="date" class="form-input" id="new_exp_start" value="{{ now.strftime('%Y-%m-%d') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new_exp_review">Review Date</label>
+                            <input type="date" class="form-input" id="new_exp_review">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addExperiment()">Add Experiment</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Wizard Navigation -->
+        <div class="wizard-nav">
+            <div class="btn-group">
+                {% if current > 1 %}
+                <a href="?mode=wizard&step={{ current - 1 }}" class="btn btn-secondary">&larr; Back</a>
+                {% endif %}
+            </div>
+            <div class="btn-group">
+                <button type="submit" name="action" value="save" class="btn btn-secondary">Save</button>
+                {% if current < 4 %}
+                <button type="submit" name="next_step" value="{{ current + 1 }}" class="btn btn-primary">
+                    Next: {{ ['', 'Reflection', 'Abstraction', 'Experimentation'][current] }} &rarr;
+                </button>
+                {% else %}
+                <button type="submit" name="action" value="complete" class="btn btn-success">Mark Complete</button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% else %}
+        <!-- Power Mode (Accordion) -->
+        <div class="accordion">
+            <!-- Experience -->
+            <div class="accordion-item open" id="acc-1">
+                <div class="accordion-header" onclick="toggleAccordion('acc-1')">
+                    <div class="accordion-title">
+                        <span class="accordion-step-badge step-1">1</span>
+                        <span>Experience</span>
+                        {% if entry.experience_text %}<span class="chip chip-complete">Done</span>{% endif %}
+                    </div>
+                    <div class="accordion-toggle">&#9660;</div>
+                </div>
+                <div class="accordion-content">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="title">Title</label>
+                            <input type="text" class="form-input" id="title" name="title" 
+                                   value="{{ entry.title or '' }}" placeholder="Brief description...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="occurred_at">Date/Time</label>
+                            <input type="datetime-local" class="form-input" id="occurred_at" name="occurred_at"
+                                   value="{{ (entry.occurred_at or now.isoformat())[:16] }}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="domain">Domain</label>
+                            <input type="text" class="form-input" id="domain" name="domain" list="domain-list"
+                                   value="{{ entry.domain or settings.default_domain or '' }}">
+                            <datalist id="domain-list">
+                                {% for d in domains %}
+                                <option value="{{ d }}">
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Valence</label>
+                            <div class="form-inline" style="height: 42px;">
+                                <label class="form-check">
+                                    <input type="radio" name="valence" value="positive" 
+                                           {% if entry.valence == 'positive' %}checked{% endif %}>
+                                    <span class="valence-indicator valence-positive"></span> Positive
+                                </label>
+                                <label class="form-check">
+                                    <input type="radio" name="valence" value="neutral" 
+                                           {% if entry.valence == 'neutral' or not entry.valence %}checked{% endif %}>
+                                    <span class="valence-indicator valence-neutral"></span> Neutral
+                                </label>
+                                <label class="form-check">
+                                    <input type="radio" name="valence" value="negative" 
+                                           {% if entry.valence == 'negative' %}checked{% endif %}>
+                                    <span class="valence-indicator valence-negative"></span> Negative
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="experience_text">Experience</label>
+                        <textarea class="form-textarea" id="experience_text" name="experience_text" 
+                                  placeholder="What happened?">{{ entry.experience_text or '' }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="tags">Tags</label>
+                        <input type="text" class="form-input" id="tags" name="tags"
+                               value="{% if entry.tags %}{% for t in entry.tags %}{{ t.name if t is mapping else t }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reflection -->
+            <div class="accordion-item" id="acc-2">
+                <div class="accordion-header" onclick="toggleAccordion('acc-2')">
+                    <div class="accordion-title">
+                        <span class="accordion-step-badge step-2">2</span>
+                        <span>Reflection</span>
+                        {% if entry.reflection_text %}<span class="chip chip-complete">Done</span>{% endif %}
+                    </div>
+                    <div class="accordion-toggle">&#9660;</div>
+                </div>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label class="form-label" for="reflection_text">Reflection</label>
+                        <p class="form-hint">How did you feel? What did you observe? Use bullet points or paragraphs.</p>
+                        <textarea class="form-textarea large" id="reflection_text" name="reflection_text"
+                                  placeholder="- How did you feel?&#10;- When did you feel this way?&#10;- What triggered these feelings?">{{ entry.reflection_text or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Abstraction -->
+            <div class="accordion-item" id="acc-3">
+                <div class="accordion-header" onclick="toggleAccordion('acc-3')">
+                    <div class="accordion-title">
+                        <span class="accordion-step-badge step-3">3</span>
+                        <span>Abstraction</span>
+                        {% if entry.abstraction_text %}<span class="chip chip-complete">Done</span>{% endif %}
+                    </div>
+                    <div class="accordion-toggle">&#9660;</div>
+                </div>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label class="form-label" for="abstraction_text">Abstraction</label>
+                        <p class="form-hint">What patterns or principles emerge? Think beyond this specific case.</p>
+                        <textarea class="form-textarea large" id="abstraction_text" name="abstraction_text"
+                                  placeholder="What general insights can you draw?">{{ entry.abstraction_text or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experimentation -->
+            <div class="accordion-item" id="acc-4">
+                <div class="accordion-header" onclick="toggleAccordion('acc-4')">
+                    <div class="accordion-title">
+                        <span class="accordion-step-badge step-4">4</span>
+                        <span>Experimentation</span>
+                        {% if entry.experiments or entry.no_experiment_needed %}<span class="chip chip-complete">Done</span>{% endif %}
+                    </div>
+                    <div class="accordion-toggle">&#9660;</div>
+                </div>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label class="form-check">
+                            <input type="checkbox" name="no_experiment_needed" id="no_experiment_needed_power"
+                                   {% if entry.no_experiment_needed %}checked{% endif %}
+                                   onchange="document.getElementById('experiments-section-power').classList.toggle('hidden', this.checked)">
+                            <span>No experiment needed</span>
+                        </label>
+                    </div>
+                    <div id="experiments-section-power" {% if entry.no_experiment_needed %}class="hidden"{% endif %}>
+                        {% if not is_new and entry.experiments %}
+                        {% for exp in entry.experiments %}
+                        <div class="experiment-item">
+                            <div class="experiment-item-main">
+                                <div class="experiment-item-text">{{ exp.text }}</div>
+                                <div class="experiment-item-meta">
+                                    <span class="chip chip-{{ exp.status }}">{{ exp.status }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                        {% if not is_new %}
+                        <div class="mt-md">
+                            <input type="text" class="form-input" id="quick-exp-text" placeholder="Quick add experiment...">
+                            <button type="button" class="btn btn-secondary btn-sm mt-sm" onclick="quickAddExperiment()">Add</button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="wizard-nav">
+            <div></div>
+            <div class="btn-group">
+                <button type="submit" name="action" value="save" class="btn btn-secondary">Save</button>
+                <button type="submit" name="action" value="complete" class="btn btn-success">Mark Complete</button>
+            </div>
+        </div>
+        {% endif %}
+    </form>
+
+    {% if not is_new %}
+    <div class="mt-lg">
+        <form method="POST" action="{{ url_for('delete_entry', entry_id=entry.id) }}" style="display:inline;">
+            <button type="submit" class="btn btn-ghost text-error" onclick="return confirm('Delete this entry?')">Delete Entry</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit Experiment Modal (hidden by default) -->
+<div id="exp-modal" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:1000;">
+    <div class="card" style="width:500px;max-width:90%;">
+        <h3>Edit Experiment</h3>
+        <form id="edit-exp-form" method="POST">
+            <input type="hidden" name="referrer" value="{{ request.url }}">
+            <div class="form-group">
+                <label class="form-label">Experiment</label>
+                <textarea class="form-textarea" name="text" id="modal-exp-text" required></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status" id="modal-exp-status">
+                        <option value="planned">Planned</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="abandoned">Abandoned</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Review Date</label>
+                    <input type="date" class="form-input" name="review_date" id="modal-exp-review">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Outcome Notes</label>
+                <textarea class="form-textarea" name="outcome_notes" id="modal-exp-outcome" placeholder="What happened?"></textarea>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-secondary" onclick="closeExpModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const entryId = {{ entry.id if entry.id else 'null' }};
+const isNew = {{ 'true' if is_new else 'false' }};
+const autosaveEnabled = {{ 'true' if settings.autosave_enabled == 'true' else 'false' }};
+
+// Toggle experiment reflection checkbox
+document.getElementById('toggle-reflect-exp')?.addEventListener('change', function() {
+    document.getElementById('reflect-exp-group').classList.toggle('hidden', !this.checked);
+    if (!this.checked) {
+        document.getElementById('reflects_on_experiment_id').value = '';
+    }
+});
+
+// Toggle no experiment needed checkbox
+document.getElementById('no_experiment_needed')?.addEventListener('change', function() {
+    document.getElementById('experiments-section').classList.toggle('hidden', this.checked);
+});
+
+// Add experiment via API
+function addExperiment() {
+    const text = document.getElementById('new_exp_text').value;
+    if (!text.trim()) return;
+    
+    const data = {
+        text: text,
+        status: document.getElementById('new_exp_status').value,
+        start_date: document.getElementById('new_exp_start').value || null,
+        review_date: document.getElementById('new_exp_review').value || null
+    };
+    
+    fetch(`/api/entry/${entryId}/experiment`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (data.warning) {
+                document.getElementById('exp-warning').textContent = data.warning;
+                document.getElementById('exp-warning').classList.add('text-warning');
+            }
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to add experiment');
+        }
+    });
+}
+
+// Quick add experiment
+function quickAddExperiment() {
+    const input = document.getElementById('quick-exp-text');
+    const text = input.value;
+    if (!text.trim()) return;
+    
+    fetch(`/api/entry/${entryId}/experiment`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text, status: 'planned'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+
+// Edit experiment modal
+function editExperiment(expId) {
+    fetch(`/api/experiment/${expId}`)
+        .then(r => r.json())
+        .catch(() => {
+            // Fallback: just open modal with form action
+        });
+    
+    // For now, just use form submission
+    const modal = document.getElementById('exp-modal');
+    const form = document.getElementById('edit-exp-form');
+    form.action = `/experiment/${expId}/update`;
+    
+    // Try to get current values from the DOM
+    const item = document.querySelector(`[data-exp-id="${expId}"]`);
+    if (item) {
+        document.getElementById('modal-exp-text').value = item.querySelector('.experiment-item-text').textContent;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+}
+
+function closeExpModal() {
+    const modal = document.getElementById('exp-modal');
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+}
+
+// Close modal on outside click
+document.getElementById('exp-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeExpModal();
+});
+</script>
+{% endblock %}

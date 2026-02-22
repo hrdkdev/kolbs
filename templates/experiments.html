@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Experiments - Kolb's Learning Cycle{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-lg">
+        <h1>Experiments</h1>
+    </div>
+
+    <form method="GET" class="filters-bar">
+        <div class="search-input">
+            <input type="text" name="search" class="form-input" 
+                   placeholder="Search experiments..." value="{{ filters.search }}">
+        </div>
+
+        <div class="filter-group">
+            <label>Status:</label>
+            <select name="status">
+                <option value="">All</option>
+                <option value="planned" {% if filters.status == 'planned' %}selected{% endif %}>Planned</option>
+                <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Active</option>
+                <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="abandoned" {% if filters.status == 'abandoned' %}selected{% endif %}>Abandoned</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label class="form-check">
+                <input type="checkbox" name="review_due" value="1" 
+                       {% if filters.review_due %}checked{% endif %}>
+                <span>Review due</span>
+            </label>
+        </div>
+
+        <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+        <a href="{{ url_for('list_experiments') }}" class="btn btn-ghost btn-sm">Clear</a>
+    </form>
+
+    <p class="text-sm text-muted mb-md">
+        Tip: Keep only a few experiments active at once for better focus.
+    </p>
+
+    {% if experiments %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th style="width: 40%;">Experiment</th>
+                <th>Status</th>
+                <th>Entry</th>
+                <th>Review Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for exp in experiments %}
+            <tr>
+                <td>
+                    <div class="experiment-item-text">{{ exp.text }}</div>
+                    {% if exp.outcome_notes %}
+                    <div class="text-sm text-muted mt-sm">
+                        <strong>Outcome:</strong> {{ exp.outcome_notes[:100] }}{% if exp.outcome_notes|length > 100 %}...{% endif %}
+                    </div>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="chip chip-{{ exp.status }}">{{ exp.status }}</span>
+                </td>
+                <td>
+                    <a href="{{ url_for('view_entry', entry_id=exp.entry_id) }}">
+                        {{ exp.entry_title or 'Untitled' }}
+                    </a>
+                </td>
+                <td>
+                    {% if exp.review_date %}
+                    {{ exp.review_date }}
+                    {% if exp.review_date <= now.strftime('%Y-%m-%d') and exp.status in ['planned', 'active'] %}
+                    <span class="text-warning">(due)</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-ghost btn-sm" 
+                                onclick="openExpModal({{ exp.id }}, '{{ exp.text | e }}', '{{ exp.status }}', '{{ exp.review_date or '' }}', '{{ (exp.outcome_notes or '') | e }}')">
+                            Edit
+                        </button>
+                        {% if exp.status in ['planned', 'active'] %}
+                        <a href="{{ url_for('new_entry', from_experiment=exp.id) }}" class="btn btn-ghost btn-sm">
+                            Reflect
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">&#128300;</div>
+        <div class="empty-state-title">No experiments found</div>
+        <div class="empty-state-text">
+            Experiments are created as part of Kolb cycle entries.
+        </div>
+        <a href="{{ url_for('new_entry') }}" class="btn btn-primary">Create Entry</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit Experiment Modal -->
+<div id="exp-modal" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:1000;">
+    <div class="card" style="width:500px;max-width:90%;">
+        <h3 class="mb-md">Edit Experiment</h3>
+        <form id="edit-exp-form" method="POST">
+            <input type="hidden" name="referrer" value="{{ request.url }}">
+            <div class="form-group">
+                <label class="form-label">Experiment</label>
+                <textarea class="form-textarea" name="text" id="modal-exp-text" required></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status" id="modal-exp-status">
+                        <option value="planned">Planned</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="abandoned">Abandoned</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Review Date</label>
+                    <input type="date" class="form-input" name="review_date" id="modal-exp-review">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Outcome Notes</label>
+                <textarea class="form-textarea" name="outcome_notes" id="modal-exp-outcome" placeholder="What happened?"></textarea>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-secondary" onclick="closeExpModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openExpModal(expId, text, status, reviewDate, outcome) {
+    const modal = document.getElementById('exp-modal');
+    const form = document.getElementById('edit-exp-form');
+    form.action = `/experiment/${expId}/update`;
+    
+    document.getElementById('modal-exp-text').value = text;
+    document.getElementById('modal-exp-status').value = status;
+    document.getElementById('modal-exp-review').value = reviewDate;
+    document.getElementById('modal-exp-outcome').value = outcome;
+    
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+}
+
+function closeExpModal() {
+    const modal = document.getElementById('exp-modal');
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+}
+
+document.getElementById('exp-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeExpModal();
+});
+</script>
+{% endblock %}

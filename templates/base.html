@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kolb's Learning Cycle{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="font-{{ settings.get('font_size', 'medium') }}{% block body_class %}{% endblock %}">
+    <header class="header">
+        <div class="header-inner{% block header_class %}{% endblock %}">
+            <a href="{{ url_for('index') }}" class="logo">Kolb Cycle</a>
+            <nav class="nav">
+                <a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>Home</a>
+                <a href="{{ url_for('goals_dashboard') }}" {% if request.endpoint in ['goals_dashboard', 'view_goal', 'new_goal', 'edit_goal', 'goal_daily_log'] %}class="active"{% endif %}>Goals</a>
+                <a href="{{ url_for('list_entries') }}" {% if request.endpoint == 'list_entries' %}class="active"{% endif %}>Entries</a>
+                <a href="{{ url_for('list_experiments') }}" {% if request.endpoint == 'list_experiments' %}class="active"{% endif %}>Experiments</a>
+                <a href="{{ url_for('export_page') }}" {% if request.endpoint == 'export_page' %}class="active"{% endif %}>Export</a>
+                <a href="{{ url_for('settings_page') }}" {% if request.endpoint == 'settings_page' %}class="active"{% endif %}>Settings</a>
+            </nav>
+        </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-messages" id="flash-messages">
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">
+            <span>{{ message }}</span>
+            <span class="flash-close" onclick="this.parentElement.remove()">&times;</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

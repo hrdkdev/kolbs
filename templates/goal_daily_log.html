@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Log {{ log_date }} - {{ goal.title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="mb-md">
+        <a href="{{ url_for('view_goal', goal_id=goal.id, tab='performance') }}" class="text-sm text-secondary">&larr; Back to {{ goal.title }}</a>
+    </div>
+
+    <div class="goal-log-header mb-lg">
+        <h1>Daily Performance Log</h1>
+        <div class="goal-log-meta">
+            <span class="text-secondary">{{ goal.title }}</span>
+            <span class="text-muted">|</span>
+            <span>{{ log_date }}</span>
+        </div>
+    </div>
+
+    <form action="{{ url_for('save_daily_log_form', goal_id=goal.id) }}" method="POST" class="card" id="daily-log-form">
+        <input type="hidden" name="log_date" value="{{ log_date }}">
+
+        <!-- Date Selector -->
+        <div class="form-group mb-lg">
+            <label class="form-label">Date</label>
+            <div class="form-inline">
+                <input type="date" name="log_date_display" class="form-input" value="{{ log_date }}" 
+                       onchange="window.location.href='{{ url_for('goal_daily_log', goal_id=goal.id) }}/' + this.value">
+                <a href="{{ url_for('goal_daily_log', goal_id=goal.id) }}" class="btn btn-ghost btn-sm">Today</a>
+            </div>
+        </div>
+
+        {% if metrics %}
+        <!-- Performance Metrics -->
+        <div class="performance-checklist">
+            <h2 class="mb-md">Performance Checklist</h2>
+            
+            {% for metric in metrics %}
+            {% set entry = entries_map.get(metric.id, {}) %}
+            <div class="metric-log-item">
+                <div class="metric-log-header">
+                    <label class="form-check">
+                        <input type="checkbox" name="completed_{{ metric.id }}" 
+                               {% if entry.get('completed') %}checked{% endif %}
+                               onchange="toggleRating(this, {{ metric.id }})">
+                        <span class="form-check-label metric-name">{{ metric.metric_name }}</span>
+                    </label>
+                </div>
+                
+                <div class="metric-log-details" id="rating-section-{{ metric.id }}" 
+                     style="{% if not entry.get('completed') %}display:none;{% endif %}">
+                    <div class="rating-row">
+                        <label class="text-sm text-secondary">Quality (1-10):</label>
+                        <div class="rating-slider">
+                            <input type="range" name="rating_{{ metric.id }}" 
+                                   min="1" max="10" value="{{ entry.get('rating', 5) }}"
+                                   oninput="updateRatingDisplay(this)">
+                            <span class="rating-value">{{ entry.get('rating', 5) }}</span>
+                        </div>
+                    </div>
+                    <div class="form-group mt-sm">
+                        <input type="text" name="notes_{{ metric.id }}" class="form-input" 
+                               value="{{ entry.get('notes', '') }}"
+                               placeholder="Optional notes for this metric">
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-title">No metrics defined</div>
+            <div class="empty-state-text">Add performance metrics to your goal before logging.</div>
+            <a href="{{ url_for('view_goal', goal_id=goal.id, tab='performance') }}" class="btn btn-primary">Add Metrics</a>
+        </div>
+        {% endif %}
+
+        <!-- General Notes -->
+        <div class="form-group mt-lg">
+            <label class="form-label">Daily Notes (optional)</label>
+            <textarea name="notes" class="form-textarea" 
+                      placeholder="Any additional reflections or observations for today">{{ existing_log.notes if existing_log else '' }}</textarea>
+        </div>
+
+        <!-- Quick Risk Review -->
+        {% if goal.risks %}
+        <div class="risk-reminder mt-lg">
+            <h3 class="text-sm mb-sm">Your Risk Scripts</h3>
+            <div class="risk-reminder-list">
+                {% for risk in goal.risks[:3] %}
+                <div class="risk-reminder-item text-sm">
+                    <span class="text-muted">If:</span> {{ risk.risk_description[:40] }}{% if risk.risk_description|length > 40 %}...{% endif %}
+                    <span class="text-muted">Then:</span> {{ risk.scripted_action[:40] }}{% if risk.scripted_action|length > 40 %}...{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if metrics %}
+        <div class="form-actions mt-lg">
+            <button type="submit" class="btn btn-primary btn-lg">Save Log</button>
+            <a href="{{ url_for('view_goal', goal_id=goal.id, tab='performance') }}" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleRating(checkbox, metricId) {
+    const section = document.getElementById('rating-section-' + metricId);
+    if (section) {
+        section.style.display = checkbox.checked ? 'block' : 'none';
+    }
+}
+
+function updateRatingDisplay(slider) {
+    const valueSpan = slider.nextElementSibling;
+    if (valueSpan) {
+        valueSpan.textContent = slider.value;
+    }
+}
+
+// Initialize rating displays
+document.querySelectorAll('.rating-slider input[type="range"]').forEach(slider => {
+    const valueSpan = slider.nextElementSibling;
+    if (valueSpan) {
+        valueSpan.textContent = slider.value;
+    }
+});
+</script>
+{% endblock %}

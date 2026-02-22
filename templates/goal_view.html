@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}{{ goal.title }} - Goals{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="mb-md">
+        <a href="{{ url_for('goals_dashboard') }}" class="text-sm text-secondary">&larr; Back to Goals</a>
+    </div>
+
+    <!-- Goal Header -->
+    <div class="goal-header mb-lg">
+        <div class="goal-header-main">
+            <h1>{{ goal.title }}</h1>
+            <div class="goal-header-meta">
+                {% if goal.target_date %}
+                <span class="text-sm text-secondary">Target: {{ goal.target_date }}</span>
+                {% endif %}
+                {% if goal.is_archived %}
+                <span class="chip chip-abandoned">Archived</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="goal-header-stats">
+            <div class="goal-stat-lg">
+                <span class="goal-stat-value {% if goal.streak > 0 %}text-success{% endif %}">{{ goal.streak }}</span>
+                <span class="goal-stat-label">day streak</span>
+            </div>
+            <div class="goal-stat-lg">
+                <span class="goal-stat-value">{{ goal.completion_rate }}%</span>
+                <span class="goal-stat-label">30-day rate</span>
+            </div>
+        </div>
+        <div class="goal-header-actions">
+            <a href="{{ url_for('goal_daily_log', goal_id=goal.id) }}" class="btn btn-primary">Log Today</a>
+            <a href="{{ url_for('edit_goal', goal_id=goal.id) }}" class="btn btn-secondary">Edit</a>
+            {% if not goal.is_archived %}
+            <form action="{{ url_for('archive_goal_route', goal_id=goal.id) }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-ghost" onclick="return confirm('Archive this goal?')">Archive</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs mb-lg">
+        <a href="{{ url_for('view_goal', goal_id=goal.id, tab='outcome') }}" 
+           class="tab {% if tab == 'outcome' %}active{% endif %}">Outcome</a>
+        <a href="{{ url_for('view_goal', goal_id=goal.id, tab='performance') }}" 
+           class="tab {% if tab == 'performance' %}active{% endif %}">Performance</a>
+        <a href="{{ url_for('view_goal', goal_id=goal.id, tab='risks') }}" 
+           class="tab {% if tab == 'risks' %}active{% endif %}">Risks & Scripts</a>
+    </div>
+
+    <!-- Tab Content -->
+    {% if tab == 'outcome' %}
+    <!-- Outcome Tab -->
+    <div class="card">
+        <h2 class="card-title mb-md">SMART Target</h2>
+        {% if goal.outcome_target %}
+        <p class="goal-outcome-text">{{ goal.outcome_target }}</p>
+        {% else %}
+        <p class="text-muted">No outcome target defined. <a href="{{ url_for('edit_goal', goal_id=goal.id) }}">Add one</a></p>
+        {% endif %}
+
+        {% if goal.target_metric %}
+        <div class="mt-md">
+            <strong>Success Metric:</strong> {{ goal.target_metric }}
+        </div>
+        {% endif %}
+
+        {% if goal.description %}
+        <div class="mt-lg">
+            <h3 class="text-sm text-secondary mb-sm">Description</h3>
+            <p>{{ goal.description }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% elif tab == 'performance' %}
+    <!-- Performance Tab -->
+    
+    <!-- Metrics Section -->
+    <div class="card mb-md">
+        <div class="card-header">
+            <h2 class="card-title">Performance Metrics</h2>
+        </div>
+        
+        {% if goal.metrics %}
+        <div class="metrics-list">
+            {% for metric in goal.metrics %}
+            <div class="metric-item">
+                <span class="metric-name">{{ metric.metric_name }}</span>
+                <form action="{{ url_for('delete_metric_form', metric_id=metric.id) }}" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-ghost btn-sm text-muted" onclick="return confirm('Delete this metric?')">Remove</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted panel-content">No metrics defined yet.</p>
+        {% endif %}
+
+        <div class="panel-content">
+            <form action="{{ url_for('add_metric_form', goal_id=goal.id) }}" method="POST" class="form-inline">
+                <input type="text" name="metric_name" class="form-input" placeholder="New metric name" required style="flex:1;">
+                <button type="submit" class="btn btn-secondary">Add Metric</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Calendar Heat Map -->
+    <div class="card mb-md">
+        <div class="card-header">
+            <h2 class="card-title">Activity Calendar (Last 90 Days)</h2>
+        </div>
+        <div class="panel-content">
+            <div class="calendar-heatmap" id="calendar-heatmap">
+                <!-- Populated by JavaScript -->
+            </div>
+            <div class="calendar-legend mt-sm">
+                <span class="text-sm text-muted">Less</span>
+                <div class="calendar-legend-scale">
+                    <div class="calendar-legend-item" style="background-color: #f5f5f5;"></div>
+                    <div class="calendar-legend-item" style="background-color: rgba(22, 163, 74, 0.3);"></div>
+                    <div class="calendar-legend-item" style="background-color: rgba(22, 163, 74, 0.5);"></div>
+                    <div class="calendar-legend-item" style="background-color: rgba(22, 163, 74, 0.7);"></div>
+                    <div class="calendar-legend-item" style="background-color: rgba(22, 163, 74, 1);"></div>
+                </div>
+                <span class="text-sm text-muted">More</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Logs -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Recent Logs</h2>
+        </div>
+        {% if goal.recent_logs %}
+        <div class="logs-list">
+            {% for log in goal.recent_logs[:10] %}
+            <div class="log-item">
+                <a href="{{ url_for('goal_daily_log', goal_id=goal.id, log_date=log.log_date) }}" class="log-date">
+                    {{ log.log_date }}
+                </a>
+                {% if log.notes %}
+                <span class="log-notes text-sm text-muted">{{ log.notes[:50] }}{% if log.notes|length > 50 %}...{% endif %}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted panel-content">No logs yet. <a href="{{ url_for('goal_daily_log', goal_id=goal.id) }}">Create your first log</a></p>
+        {% endif %}
+    </div>
+
+    {% elif tab == 'risks' %}
+    <!-- Risks Tab -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Anticipated Risks & Scripted Actions</h2>
+        </div>
+        <div class="panel-content">
+            <p class="text-sm text-muted mb-md">Prepare for obstacles with "If-Then" scripts. When you anticipate a risk and have a scripted response, you're more likely to stay on track.</p>
+        </div>
+
+        {% if goal.risks %}
+        <div class="risks-list">
+            {% for risk in goal.risks %}
+            <div class="risk-item">
+                <div class="risk-content">
+                    <div class="risk-description">
+                        <strong>If:</strong> {{ risk.risk_description }}
+                    </div>
+                    <div class="risk-action">
+                        <strong>Then:</strong> {{ risk.scripted_action }}
+                    </div>
+                </div>
+                <form action="{{ url_for('delete_risk_form', risk_id=risk.id) }}" method="POST">
+                    <button type="submit" class="btn btn-ghost btn-sm text-muted" onclick="return confirm('Delete this risk?')">Remove</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted panel-content">No risks defined yet.</p>
+        {% endif %}
+
+        <div class="panel-content mt-md">
+            <h3 class="text-sm mb-sm">Add New Risk</h3>
+            <form action="{{ url_for('add_risk_form', goal_id=goal.id) }}" method="POST">
+                <div class="form-group">
+                    <label class="form-label">If I...</label>
+                    <input type="text" name="risk_description" class="form-input" 
+                           placeholder="e.g., feel tired, get distracted, face a difficult problem" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Then I will...</label>
+                    <input type="text" name="scripted_action" class="form-input" 
+                           placeholder="e.g., take a 5-minute walk, use the Pomodoro technique, ask for help" required>
+                </div>
+                <button type="submit" class="btn btn-secondary">Add Risk</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Generate calendar dynamically with correct dates
+(function() {
+    const container = document.getElementById('calendar-heatmap');
+    if (!container) return;
+    
+    const calendarData = {{ goal.calendar_data | tojson | safe }};
+    const today = new Date();
+    
+    container.innerHTML = '';
+    
+    for (let i = 89; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayData = calendarData[dateStr] || {};
+        const completion = dayData.completion || 0;
+        const logged = dayData.logged || false;
+        
+        const dayEl = document.createElement('div');
+        dayEl.className = 'calendar-day' + (logged ? ' logged' : '');
+        dayEl.dataset.date = dateStr;
+        dayEl.dataset.completion = completion;
+        
+        if (logged) {
+            const alpha = 0.2 + completion * 0.8;
+            dayEl.style.backgroundColor = `rgba(22, 163, 74, ${alpha})`;
+        }
+        
+        dayEl.title = `${dateStr}: ${logged ? Math.round(completion * 100) + '% completed' : 'No log'}`;
+        
+        container.appendChild(dayEl);
+    }
+})();
+</script>
+{% endblock %}
