@@ -28,7 +28,6 @@
                 <tr>
                     <th>Entry</th>
                     <th>Date</th>
-                    <th>Status</th>
                     <th>Export</th>
                 </tr>
             </thead>
@@ -41,13 +40,6 @@
                         </a>
                     </td>
                     <td>{{ entry.occurred_at[:10] if entry.occurred_at else '-' }}</td>
-                    <td>
-                        {% if entry.is_complete %}
-                        <span class="chip chip-complete">Complete</span>
-                        {% else %}
-                        <span class="chip chip-draft">Draft</span>
-                        {% endif %}
-                    </td>
                     <td>
                         <div class="btn-group">
                             <a href="{{ url_for('export_entry_markdown', entry_id=entry.id) }}" 

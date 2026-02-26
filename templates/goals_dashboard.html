@@ -90,9 +90,14 @@
                 {% for goal in archived_goals %}
                 <div class="archived-goal-item">
                     <span>{{ goal.title }}</span>
-                    <form action="{{ url_for('unarchive_goal_route', goal_id=goal.id) }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-ghost btn-sm">Restore</button>
-                    </form>
+                    <div>
+                        <form action="{{ url_for('unarchive_goal_route', goal_id=goal.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-ghost btn-sm">Restore</button>
+                        </form>
+                        <form action="{{ url_for('delete_goal_route', goal_id=goal.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-ghost btn-sm text-danger" onclick="return confirm('Permanently delete this goal? This cannot be undone.')">Delete</button>
+                        </form>
+                    </div>
                 </div>
                 {% endfor %}
             </div>

@@ -10,13 +10,6 @@
         <div class="flex-center gap-md">
             <a href="{{ url_for('index') }}" class="btn btn-ghost">&larr; Back</a>
             <h1 class="mb-0">{% if is_new %}New Entry{% else %}Edit Entry{% endif %}</h1>
-            {% if not is_new %}
-            {% if entry.is_complete %}
-            <span class="chip chip-complete">Complete</span>
-            {% else %}
-            <span class="chip chip-draft">Draft - {{ entry.completion }}%</span>
-            {% endif %}
-            {% endif %}
         </div>
         <div class="flex-center gap-sm">
             <div class="save-indicator" id="save-indicator">
@@ -391,7 +384,7 @@
                     Next: {{ ['', 'Reflection', 'Abstraction', 'Experimentation'][current] }} &rarr;
                 </button>
                 {% else %}
-                <button type="submit" name="action" value="complete" class="btn btn-success">Mark Complete</button>
+                <button type="submit" name="action" value="save" class="btn btn-primary">Save &amp; Close</button>
                 {% endif %}
             </div>
         </div>
@@ -553,8 +546,7 @@
         <div class="wizard-nav">
             <div></div>
             <div class="btn-group">
-                <button type="submit" name="action" value="save" class="btn btn-secondary">Save</button>
-                <button type="submit" name="action" value="complete" class="btn btn-success">Mark Complete</button>
+                <button type="submit" name="action" value="save" class="btn btn-primary">Save</button>
             </div>
         </div>
         {% endif %}

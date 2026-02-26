@@ -1107,6 +1107,12 @@ def archive_goal(goal_id):
     update_goal(goal_id, {"is_archived": True})
 
 
+def delete_goal(goal_id):
+    """Permanently delete a goal and all related data."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM goals WHERE id = ?", (goal_id,))
+
+
 def list_goals(include_archived=False):
     """List all goals."""
     query = "SELECT * FROM goals"

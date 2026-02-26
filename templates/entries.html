@@ -19,15 +19,6 @@
             <input type="text" name="search" class="form-input" 
                    placeholder="Search entries..." value="{{ filters.search }}" id="search-input">
         </div>
-        
-        <div class="filter-group">
-            <label>Status:</label>
-            <select name="status">
-                <option value="">All</option>
-                <option value="draft" {% if filters.status == 'draft' %}selected{% endif %}>Draft</option>
-                <option value="complete" {% if filters.status == 'complete' %}selected{% endif %}>Complete</option>
-            </select>
-        </div>
 
         <div class="filter-group">
             <label>Domain:</label>
@@ -94,11 +85,6 @@
                     <a href="{{ url_for('view_entry', entry_id=entry.id) }}">
                         {{ entry.title or 'Untitled' }}
                     </a>
-                    {% if entry.is_complete %}
-                    <span class="chip chip-complete">Complete</span>
-                    {% else %}
-                    <span class="chip chip-draft">Draft</span>
-                    {% endif %}
                 </div>
                 <div class="entry-item-meta">
                     <span>{{ entry.occurred_at[:10] if entry.occurred_at else 'No date' }}</span>
@@ -123,7 +109,6 @@
                 {% endif %}
             </div>
             <div class="entry-item-progress">
-                <div class="entry-item-progress-label">{{ entry.completion }}%</div>
                 <div class="progress-bar">
                     <div class="progress-fill {% if entry.completion == 100 %}complete{% endif %}" 
                          style="width: {{ entry.completion }}%"></div>
@@ -136,34 +121,33 @@
     {% if total_pages > 1 %}
     <div class="pagination">
         {% if page > 1 %}
-        <a href="{{ url_for('list_entries', page=page-1, search=filters.search, domain=filters.domain, valence=filters.valence, status=filters.status, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">&larr; Prev</a>
+        <a href="{{ url_for('list_entries', page=page-1, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">&larr; Prev</a>
         {% endif %}
         
         {% for p in range(1, total_pages + 1) %}
             {% if p == page %}
             <span class="current">{{ p }}</span>
             {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
-            <a href="{{ url_for('list_entries', page=p, search=filters.search, domain=filters.domain, valence=filters.valence, status=filters.status, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">{{ p }}</a>
+            <a href="{{ url_for('list_entries', page=p, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">{{ p }}</a>
             {% elif p == 4 or p == total_pages - 2 %}
             <span>...</span>
             {% endif %}
         {% endfor %}
         
         {% if page < total_pages %}
-        <a href="{{ url_for('list_entries', page=page+1, search=filters.search, domain=filters.domain, valence=filters.valence, status=filters.status, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">Next &rarr;</a>
+        <a href="{{ url_for('list_entries', page=page+1, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">Next &rarr;</a>
         {% endif %}
     </div>
     {% endif %}
 
     {% else %}
     <div class="empty-state">
-        <div class="empty-state-icon">&#128221;</div>
         <div class="empty-state-title">No entries found</div>
         <div class="empty-state-text">
             {% if filters.search or filters.domain or filters.tag %}
             Try adjusting your filters or search terms.
             {% else %}
-            Start by creating your first Kolb cycle entry.
+            Start by capturing an experience.
             {% endif %}
         </div>
         <a href="{{ url_for('new_entry') }}" class="btn btn-primary">Create Entry</a>

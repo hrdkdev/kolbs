@@ -39,6 +39,9 @@
                 <button type="submit" class="btn btn-ghost" onclick="return confirm('Archive this goal?')">Archive</button>
             </form>
             {% endif %}
+            <form action="{{ url_for('delete_goal_route', goal_id=goal.id) }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-ghost text-danger" onclick="return confirm('Permanently delete this goal? This cannot be undone and will delete all logs, metrics, and risks.')">Delete</button>
+            </form>
         </div>
     </div>
 

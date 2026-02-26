@@ -66,18 +66,16 @@ def get_filters_from_request():
 @app.route("/")
 def index():
     """Home dashboard."""
+    # Get recent entries (no status filtering)
     recent_entries = db.list_entries(limit=10)
     for entry in recent_entries:
         entry["completion"] = db.calculate_completion(entry)
-        entry["missing_steps"] = db.get_missing_steps(entry)
 
-    latest_draft = db.get_latest_draft()
     active_experiments = db.get_active_experiments()[:5]
 
     return render_template(
         "index.html",
         recent_entries=recent_entries,
-        latest_draft=latest_draft,
         active_experiments=active_experiments,
     )
 
@@ -357,16 +355,6 @@ def create_entry_form():
         tag_names = [t.strip() for t in tags_str.split(",") if t.strip()]
         db.set_entry_tags(entry_id, tag_names)
 
-    # Handle marking complete
-    if request.form.get("action") == "complete":
-        entry = db.get_entry(entry_id)
-        can_complete, msg = db.can_mark_complete(entry)
-        if can_complete:
-            db.update_entry(entry_id, {"is_complete": True})
-            flash("Entry marked complete", "success")
-        else:
-            flash(f"Cannot mark complete: {msg}", "error")
-
     flash("Entry created", "success")
     return redirect(url_for("view_entry", entry_id=entry_id))
 
@@ -407,17 +395,6 @@ def update_entry_form(entry_id):
     tags_str = request.form.get("tags", "")
     tag_names = [t.strip() for t in tags_str.split(",") if t.strip()]
     db.set_entry_tags(entry_id, tag_names)
-
-    # Handle marking complete
-    if request.form.get("action") == "complete":
-        entry = db.get_entry(entry_id)
-        can_complete, msg = db.can_mark_complete(entry)
-        if can_complete:
-            db.update_entry(entry_id, {"is_complete": True})
-            flash("Entry marked complete", "success")
-        else:
-            flash(f"Cannot mark complete: {msg}", "error")
-            return redirect(url_for("view_entry", entry_id=entry_id))
 
     flash("Entry saved", "success")
 
@@ -803,6 +780,14 @@ def unarchive_goal_route(goal_id):
 
     db.update_goal(goal_id, {"is_archived": False})
     flash("Goal restored", "success")
+    return redirect(url_for("goals_dashboard"))
+
+
+@app.route("/goals/<int:goal_id>/delete", methods=["POST"])
+def delete_goal_route(goal_id):
+    """Permanently delete a goal."""
+    db.delete_goal(goal_id)
+    flash("Goal permanently deleted", "success")
     return redirect(url_for("goals_dashboard"))
 
 

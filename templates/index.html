@@ -7,128 +7,108 @@
     <div class="actions-row">
         <a href="{{ url_for('new_entry', quick=1) }}" class="btn btn-primary btn-lg">Quick Capture</a>
         <a href="{{ url_for('new_entry') }}" class="btn btn-secondary btn-lg">New Kolb</a>
-        {% if latest_draft %}
-        <a href="{{ url_for('view_entry', entry_id=latest_draft.id) }}" class="btn btn-secondary btn-lg">
-            Continue Draft
-        </a>
-        {% endif %}
     </div>
 
-    <div class="dashboard-grid">
-        <div class="panel">
-            <div class="panel-header">
-                <span>Recent Entries</span>
-                <a href="{{ url_for('list_entries') }}" class="btn btn-ghost btn-sm">View All</a>
-            </div>
-            <div class="panel-content">
-                {% if recent_entries %}
-                <div class="entry-list">
-                    {% for entry in recent_entries %}
-                    <div class="entry-item">
-                        <div class="entry-item-main">
-                            <div class="entry-item-title">
-                                <span class="valence-indicator valence-{{ entry.valence }}"></span>
-                                <a href="{{ url_for('view_entry', entry_id=entry.id) }}">
-                                    {{ entry.title or 'Untitled' }}
-                                </a>
-                                {% if entry.is_complete %}
-                                <span class="chip chip-complete">Complete</span>
-                                {% else %}
-                                <span class="chip chip-draft">Draft</span>
-                                {% endif %}
-                            </div>
-                            <div class="entry-item-meta">
-                                <span>{{ entry.occurred_at[:10] if entry.occurred_at else 'No date' }}</span>
-                                {% if entry.domain %}
-                                <span>{{ entry.domain }}</span>
-                                {% endif %}
-                                {% if entry.experiment_count %}
-                                <span>{{ entry.experiment_count }} experiment{{ 's' if entry.experiment_count != 1 else '' }}</span>
-                                {% endif %}
-                            </div>
-                            {% if entry.tags %}
-                            <div class="entry-item-tags">
-                                {% for tag in entry.tags %}
-                                <span class="tag-item">{{ tag }}</span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            {% if entry.missing_steps %}
-                            <div class="text-sm text-muted mt-md">
-                                Missing: {{ entry.missing_steps | join(', ') }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div class="entry-item-progress">
-                            <div class="entry-item-progress-label">{{ entry.completion }}%</div>
-                            <div class="progress-bar">
-                                <div class="progress-fill {% if entry.completion == 100 %}complete{% endif %}" 
-                                     style="width: {{ entry.completion }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-state">
-                    <div class="empty-state-title">No entries yet</div>
-                    <div class="empty-state-text">Start by creating your first Kolb cycle entry.</div>
-                    <a href="{{ url_for('new_entry') }}" class="btn btn-primary">Create Entry</a>
-                </div>
-                {% endif %}
-            </div>
+    <div class="panel mb-lg">
+        <div class="panel-header">
+            <span>Active Experiments</span>
+            <a href="{{ url_for('list_experiments') }}" class="btn btn-ghost btn-sm">View All</a>
         </div>
-
-        <div>
-            <div class="panel">
-                <div class="panel-header">
-                    <span>Active Experiments</span>
-                    <a href="{{ url_for('list_experiments') }}" class="btn btn-ghost btn-sm">View All</a>
-                </div>
-                <div class="panel-content">
-                    {% if active_experiments %}
-                    {% for exp in active_experiments %}
-                    <div class="experiment-item">
-                        <div class="experiment-item-main">
-                            <div class="experiment-item-text">{{ exp.text[:100] }}{% if exp.text|length > 100 %}...{% endif %}</div>
-                            <div class="experiment-item-meta">
-                                <span class="chip chip-{{ exp.status }}">{{ exp.status }}</span>
-                                {% if exp.review_date %}
-                                <span>Review: {{ exp.review_date }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
+        <div class="panel-content">
+            {% if active_experiments %}
+            {% for exp in active_experiments %}
+            <div class="experiment-item">
+                <div class="experiment-item-main">
+                    <div class="experiment-item-text">{{ exp.text[:100] }}{% if exp.text|length > 100 %}...{% endif %}</div>
+                    <div class="experiment-item-meta">
+                        <span class="chip chip-{{ exp.status }}">{{ exp.status }}</span>
+                        {% if exp.review_date %}
+                        <span>Review: {{ exp.review_date }}</span>
+                        {% endif %}
                     </div>
-                    {% endfor %}
-                    <p class="text-sm text-muted mt-md">
-                        Tip: Keep only a few experiments active at once for better focus.
-                    </p>
-                    {% else %}
-                    <div class="panel-empty">
-                        <p class="text-muted">No active experiments</p>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
+            {% endfor %}
+            <p class="text-sm text-muted mt-md">
+                Tip: Keep only a few experiments active at once for better focus.
+            </p>
+            {% else %}
+            <div class="panel-empty">
+                <p class="text-muted">No active experiments</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 
-            <div class="panel mt-md">
-                <div class="panel-header">
-                    <span>Quick Actions</span>
+    <div class="panel">
+        <div class="panel-header">
+            <span>Recent Entries</span>
+            <a href="{{ url_for('list_entries') }}" class="btn btn-ghost btn-sm">View All</a>
+        </div>
+        <div class="panel-content">
+            {% if recent_entries %}
+            <div class="entry-list">
+                {% for entry in recent_entries %}
+                <div class="entry-item">
+                    <div class="entry-item-main">
+                        <div class="entry-item-title">
+                            <span class="valence-indicator valence-{{ entry.valence }}"></span>
+                            <a href="{{ url_for('view_entry', entry_id=entry.id) }}">
+                                {{ entry.title or 'Untitled' }}
+                            </a>
+                        </div>
+                        <div class="entry-item-meta">
+                            <span>{{ entry.occurred_at[:10] if entry.occurred_at else 'No date' }}</span>
+                            {% if entry.domain %}
+                            <span>{{ entry.domain }}</span>
+                            {% endif %}
+                            {% if entry.experiment_count %}
+                            <span>{{ entry.experiment_count }} experiment{{ 's' if entry.experiment_count != 1 else '' }}</span>
+                            {% endif %}
+                        </div>
+                        {% if entry.tags %}
+                        <div class="entry-item-tags">
+                            {% for tag in entry.tags %}
+                            <span class="tag-item">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="entry-item-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill {% if entry.completion == 100 %}complete{% endif %}" 
+                                 style="width: {{ entry.completion }}%"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="panel-content">
-                    <div class="flex flex-between mb-sm">
-                        <span class="text-sm">Search</span>
-                        <span class="kbd">/</span>
-                    </div>
-                    <div class="flex flex-between mb-sm">
-                        <span class="text-sm">Save</span>
-                        <span class="kbd">Ctrl+S</span>
-                    </div>
-                    <div class="flex flex-between mb-sm">
-                        <span class="text-sm">Next Step</span>
-                        <span class="kbd">Ctrl+Enter</span>
-                    </div>
-                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-title">No entries yet</div>
+                <div class="empty-state-text">Start by capturing an experience.</div>
+                <a href="{{ url_for('new_entry') }}" class="btn btn-primary">Create Entry</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel mt-lg">
+        <div class="panel-header">
+            <span>Quick Actions</span>
+        </div>
+        <div class="panel-content">
+            <div class="flex flex-between mb-sm">
+                <span class="text-sm">Search</span>
+                <span class="kbd">/</span>
+            </div>
+            <div class="flex flex-between mb-sm">
+                <span class="text-sm">Save</span>
+                <span class="kbd">Ctrl+S</span>
+            </div>
+            <div class="flex flex-between mb-sm">
+                <span class="text-sm">Next Step</span>
+                <span class="kbd">Ctrl+Enter</span>
             </div>
         </div>
     </div>
