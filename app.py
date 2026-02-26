@@ -99,6 +99,8 @@ def new_entry():
         if exp:
             prefill["reflects_on_experiment_id"] = exp["id"]
             prefill["reflects_on_experiment"] = exp
+            prefill["reflection_prompts"] = {}
+            prefill["abstraction_prompts"] = {}
 
     domains = db.get_all_domains()
     tags = db.get_all_tags()
