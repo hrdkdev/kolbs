@@ -71,7 +71,7 @@ def index():
     for entry in recent_entries:
         entry["completion"] = db.calculate_completion(entry)
 
-    active_experiments = db.get_active_experiments()[:5]
+    active_experiments = db.get_active_experiments()
 
     return render_template(
         "index.html",

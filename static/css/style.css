@@ -687,6 +687,11 @@ main {
     gap: var(--space-sm);
 }
 
+.entry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
 .entry-item {
     display: flex;
     align-items: flex-start;
@@ -696,6 +701,10 @@ main {
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.entry-grid .entry-item {
+    height: 100%;
 }
 
 .entry-item:hover {
@@ -772,6 +781,19 @@ main {
 .experiment-item-meta {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
+}
+
+/* Home experiments grid */
+.experiment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-sm);
+}
+
+.experiment-card {
+    height: 100%;
+    margin-bottom: 0;
+    border: 1px solid var(--border-light);
 }
 
 /* Prompt blocks */

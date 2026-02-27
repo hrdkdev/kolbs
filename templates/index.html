@@ -16,8 +16,9 @@
         </div>
         <div class="panel-content">
             {% if active_experiments %}
+            <div class="experiment-grid">
             {% for exp in active_experiments %}
-            <div class="experiment-item">
+            <div class="experiment-item experiment-card">
                 <div class="experiment-item-main">
                     <div class="experiment-item-text">{{ exp.text[:100] }}{% if exp.text|length > 100 %}...{% endif %}</div>
                     <div class="experiment-item-meta">
@@ -29,6 +30,7 @@
                 </div>
             </div>
             {% endfor %}
+            </div>
             <p class="text-sm text-muted mt-md">
                 Tip: Keep only a few experiments active at once for better focus.
             </p>
@@ -47,7 +49,7 @@
         </div>
         <div class="panel-content">
             {% if recent_entries %}
-            <div class="entry-list">
+            <div class="entry-list entry-grid">
                 {% for entry in recent_entries %}
                 <div class="entry-item">
                     <div class="entry-item-main">
