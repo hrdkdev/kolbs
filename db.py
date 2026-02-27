@@ -526,12 +526,24 @@ def get_latest_draft():
 
 def calculate_completion(entry):
     """Calculate completion percentage for an entry."""
+    experience_done = bool(entry.get("experience_text")) or (
+        bool(entry.get("title"))
+        and bool(entry.get("domain"))
+        and bool(entry.get("occurred_at"))
+    )
+    reflection_done = bool(entry.get("reflection_text")) or bool(
+        entry.get("reflection_prompts")
+    )
+    abstraction_done = bool(entry.get("abstraction_text")) or bool(
+        entry.get("abstraction_prompts")
+    )
+
     steps = 0
-    if entry.get("experience_text"):
+    if experience_done:
         steps += 1
-    if entry.get("reflection_text"):
+    if reflection_done:
         steps += 1
-    if entry.get("abstraction_text"):
+    if abstraction_done:
         steps += 1
     if entry.get("experiments") and len(entry["experiments"]) > 0:
         steps += 1
@@ -542,12 +554,24 @@ def calculate_completion(entry):
 
 def get_missing_steps(entry):
     """Get list of missing steps for an entry."""
+    experience_done = bool(entry.get("experience_text")) or (
+        bool(entry.get("title"))
+        and bool(entry.get("domain"))
+        and bool(entry.get("occurred_at"))
+    )
+    reflection_done = bool(entry.get("reflection_text")) or bool(
+        entry.get("reflection_prompts")
+    )
+    abstraction_done = bool(entry.get("abstraction_text")) or bool(
+        entry.get("abstraction_prompts")
+    )
+
     missing = []
-    if not entry.get("experience_text"):
+    if not experience_done:
         missing.append("Experience")
-    if not entry.get("reflection_text"):
+    if not reflection_done:
         missing.append("Reflection")
-    if not entry.get("abstraction_text"):
+    if not abstraction_done:
         missing.append("Abstraction")
     if not entry.get("no_experiment_needed"):
         # Check if has experiments
@@ -901,12 +925,27 @@ def validate_experiment_specificity(text):
 
 def can_mark_complete(entry):
     """Check if an entry can be marked complete."""
-    if not entry.get("experience_text"):
-        return False, "Experience text is required"
-    if not entry.get("reflection_text"):
-        return False, "Reflection text is required"
-    if not entry.get("abstraction_text"):
-        return False, "Abstraction text is required"
+    experience_done = bool(entry.get("experience_text")) or (
+        bool(entry.get("title"))
+        and bool(entry.get("domain"))
+        and bool(entry.get("occurred_at"))
+    )
+    reflection_done = bool(entry.get("reflection_text")) or bool(
+        entry.get("reflection_prompts")
+    )
+    abstraction_done = bool(entry.get("abstraction_text")) or bool(
+        entry.get("abstraction_prompts")
+    )
+
+    if not experience_done:
+        return (
+            False,
+            "Experience text or title+metadata (domain/date) are required",
+        )
+    if not reflection_done:
+        return False, "Reflection text or prompt responses are required"
+    if not abstraction_done:
+        return False, "Abstraction text or prompt responses are required"
 
     if not entry.get("no_experiment_needed"):
         exp_count = len(entry.get("experiments", []))

@@ -33,11 +33,13 @@
         {% if mode == 'wizard' %}
         <!-- Wizard Mode -->
         {% set current = (request.args.get('step', entry.current_step or 1) | int) %}
+        <input type="hidden" name="reflection_prompts" id="reflection_prompts_json" value="{}">
+        <input type="hidden" name="abstraction_prompts" id="abstraction_prompts_json" value="{}">
         
         <div class="wizard-steps mb-lg">
             {% for step_num, step_name in [(1, 'Experience'), (2, 'Reflection'), (3, 'Abstraction'), (4, 'Experimentation')] %}
             <a href="?mode=wizard&step={{ step_num }}" 
-               class="wizard-step {% if step_num == current %}active{% endif %} {% if entry.get(step_name.lower() + '_text') or (step_num == 4 and entry.experiments) %}completed{% endif %}">
+               class="wizard-step {% if step_num == current %}active{% endif %} {% if (step_num == 1 and (entry.experience_text or (entry.title and entry.domain and entry.occurred_at))) or (step_num == 2 and (entry.reflection_text or entry.reflection_prompts)) or (step_num == 3 and (entry.abstraction_text or entry.abstraction_prompts)) or (step_num == 4 and (entry.experiments or entry.no_experiment_needed)) %}completed{% endif %}">
                 <span class="wizard-step-number">{{ step_num }}</span>
                 <span>{{ step_name }}</span>
             </a>
@@ -398,7 +400,7 @@
                     <div class="accordion-title">
                         <span class="accordion-step-badge step-1">1</span>
                         <span>Experience</span>
-                        {% if entry.experience_text %}<span class="chip chip-complete">Done</span>{% endif %}
+                        {% if entry.experience_text or (entry.title and entry.domain and entry.occurred_at) %}<span class="chip chip-complete">Done</span>{% endif %}
                     </div>
                     <div class="accordion-toggle">&#9660;</div>
                 </div>
@@ -466,7 +468,7 @@
                     <div class="accordion-title">
                         <span class="accordion-step-badge step-2">2</span>
                         <span>Reflection</span>
-                        {% if entry.reflection_text %}<span class="chip chip-complete">Done</span>{% endif %}
+                        {% if entry.reflection_text or entry.reflection_prompts %}<span class="chip chip-complete">Done</span>{% endif %}
                     </div>
                     <div class="accordion-toggle">&#9660;</div>
                 </div>
@@ -486,7 +488,7 @@
                     <div class="accordion-title">
                         <span class="accordion-step-badge step-3">3</span>
                         <span>Abstraction</span>
-                        {% if entry.abstraction_text %}<span class="chip chip-complete">Done</span>{% endif %}
+                        {% if entry.abstraction_text or entry.abstraction_prompts %}<span class="chip chip-complete">Done</span>{% endif %}
                     </div>
                     <div class="accordion-toggle">&#9660;</div>
                 </div>
@@ -604,6 +606,33 @@
 const entryId = {{ entry.id if entry.id else 'null' }};
 const isNew = {{ 'true' if is_new else 'false' }};
 const autosaveEnabled = {{ 'true' if settings.autosave_enabled == 'true' else 'false' }};
+
+function serializePromptResponses() {
+    const reflectionPrompts = {};
+    document.querySelectorAll('#step-2 .prompt-textarea[data-prompt-name]').forEach(textarea => {
+        const promptName = textarea.getAttribute('data-prompt-name');
+        const value = textarea.value.trim();
+        if (promptName && value) {
+            reflectionPrompts[promptName] = value;
+        }
+    });
+
+    const abstractionPrompts = {};
+    document.querySelectorAll('#step-3 .prompt-textarea[data-prompt-name]').forEach(textarea => {
+        const promptName = textarea.getAttribute('data-prompt-name');
+        const value = textarea.value.trim();
+        if (promptName && value) {
+            abstractionPrompts[promptName] = value;
+        }
+    });
+
+    const reflectionInput = document.getElementById('reflection_prompts_json');
+    const abstractionInput = document.getElementById('abstraction_prompts_json');
+    if (reflectionInput) reflectionInput.value = JSON.stringify(reflectionPrompts);
+    if (abstractionInput) abstractionInput.value = JSON.stringify(abstractionPrompts);
+}
+
+document.getElementById('entry-form')?.addEventListener('submit', serializePromptResponses);
 
 // Toggle experiment reflection checkbox
 document.getElementById('toggle-reflect-exp')?.addEventListener('change', function() {
