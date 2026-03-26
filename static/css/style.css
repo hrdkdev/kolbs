@@ -1208,6 +1208,188 @@ body.distraction-free .card {
     color: var(--text-secondary);
 }
 
+/* ==========================================
+   Single-Page Entry Layout
+   ========================================== */
+
+/* Title input — styled like a heading */
+.entry-header-row {
+    margin-bottom: var(--space-sm);
+}
+
+.entry-title-input {
+    width: 100%;
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    border-bottom: 2px solid var(--border-light);
+    background: transparent;
+    padding: var(--space-sm) 0;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.entry-title-input:focus {
+    border-bottom-color: var(--accent-primary);
+}
+
+.entry-title-input::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* Details toggle and panel */
+.entry-details-toggle {
+    margin-bottom: var(--space-xs);
+}
+
+.entry-details-panel {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+    border: 1px solid var(--border-light);
+}
+
+/* Stages container */
+.stages-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Stage sections */
+.stage-section {
+    border-left: 3px solid var(--border-light);
+    padding: var(--space-md) var(--space-lg);
+    transition: border-color 0.15s ease;
+}
+
+.stage-section:focus-within {
+    border-left-color: var(--accent-primary);
+}
+
+.stage-section[data-stage="1"] { border-left-color: var(--step-1); }
+.stage-section[data-stage="2"] { border-left-color: var(--step-2); }
+.stage-section[data-stage="3"] { border-left-color: var(--step-3); }
+.stage-section[data-stage="4"] { border-left-color: var(--step-4); }
+
+/* Stage header */
+.stage-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.stage-number {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+}
+
+.stage-number.stage-1 { background: var(--step-1); }
+.stage-number.stage-2 { background: var(--step-2); }
+.stage-number.stage-3 { background: var(--step-3); }
+.stage-number.stage-4 { background: var(--step-4); }
+
+.stage-title {
+    font-weight: 600;
+    font-size: var(--font-size-base);
+}
+
+/* Stage textareas — minimal, blend in */
+.stage-textarea {
+    width: 100%;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    line-height: 1.6;
+    resize: none;
+    overflow: hidden;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    min-height: 60px;
+}
+
+.stage-textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.stage-textarea::placeholder {
+    color: var(--text-muted);
+}
+
+/* Prompts grid — compact */
+.prompts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: var(--space-sm);
+}
+
+/* Experiment rows */
+.experiment-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius);
+    margin-bottom: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.experiment-row-text {
+    flex: 1;
+    min-width: 200px;
+    font-weight: 500;
+}
+
+.experiment-row-meta {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+}
+
+.experiment-row-actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.experiment-add-row {
+    margin-top: var(--space-xs);
+}
+
+/* Bottom actions bar */
+.entry-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--space-md);
+    margin-top: var(--space-md);
+    border-top: 1px solid var(--border-light);
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-primary);
+    padding-bottom: var(--space-md);
+    z-index: 10;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .container {

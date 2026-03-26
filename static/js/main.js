@@ -70,7 +70,7 @@
 
         // Collect reflection prompt responses
         const reflectionPrompts = {};
-        document.querySelectorAll('#step-2 .prompt-textarea[data-prompt-name]').forEach(textarea => {
+        document.querySelectorAll('[data-stage="2"] .prompt-textarea[data-prompt-name], #step-2 .prompt-textarea[data-prompt-name]').forEach(textarea => {
             const promptName = textarea.getAttribute('data-prompt-name');
             if (promptName && textarea.value.trim()) {
                 reflectionPrompts[promptName] = textarea.value;
@@ -80,7 +80,7 @@
 
         // Collect abstraction prompt responses
         const abstractionPrompts = {};
-        document.querySelectorAll('#step-3 .prompt-textarea[data-prompt-name]').forEach(textarea => {
+        document.querySelectorAll('[data-stage="3"] .prompt-textarea[data-prompt-name], #step-3 .prompt-textarea[data-prompt-name]').forEach(textarea => {
             const promptName = textarea.getAttribute('data-prompt-name');
             if (promptName && textarea.value.trim()) {
                 abstractionPrompts[promptName] = textarea.value;
@@ -97,10 +97,12 @@
     }
 
     async function autosave() {
-        // Check if we're on an entry page and autosave is enabled
-        if (typeof entryId === 'undefined' || entryId === null) return;
+        // Check if we're on an entry page
+        // Support both entryId and currentEntryId (from auto-create)
+        const activeId = (typeof currentEntryId !== 'undefined' && currentEntryId) ? currentEntryId : 
+                         (typeof entryId !== 'undefined' ? entryId : null);
+        if (!activeId) return;
         if (typeof autosaveEnabled !== 'undefined' && !autosaveEnabled) return;
-        if (typeof isNew !== 'undefined' && isNew) return;
 
         const data = getFormData();
         if (!data || !hasDataChanged(data)) return;
@@ -108,7 +110,7 @@
         showSaveStatus('saving', 'Saving...');
 
         try {
-            const response = await fetch(`/api/entry/${entryId}`, {
+            const response = await fetch(`/api/entry/${activeId}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json'

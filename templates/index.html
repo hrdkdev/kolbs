@@ -5,8 +5,7 @@
 {% block content %}
 <div class="container">
     <div class="actions-row">
-        <a href="{{ url_for('new_entry', quick=1) }}" class="btn btn-primary btn-lg">Quick Capture</a>
-        <a href="{{ url_for('new_entry') }}" class="btn btn-secondary btn-lg">New Kolb</a>
+        <a href="{{ url_for('new_entry') }}" class="btn btn-primary btn-lg">+ New Entry</a>
     </div>
 
     <div class="panel mb-lg">
@@ -95,24 +94,5 @@
         </div>
     </div>
 
-    <div class="panel mt-lg">
-        <div class="panel-header">
-            <span>Quick Actions</span>
-        </div>
-        <div class="panel-content">
-            <div class="flex flex-between mb-sm">
-                <span class="text-sm">Search</span>
-                <span class="kbd">/</span>
-            </div>
-            <div class="flex flex-between mb-sm">
-                <span class="text-sm">Save</span>
-                <span class="kbd">Ctrl+S</span>
-            </div>
-            <div class="flex flex-between mb-sm">
-                <span class="text-sm">Next Step</span>
-                <span class="kbd">Ctrl+Enter</span>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
