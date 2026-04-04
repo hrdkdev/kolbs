@@ -209,7 +209,7 @@ def set_setting(key, value):
 def get_all_settings():
     """Get all settings as a dict."""
     defaults = {
-        "preferred_mode": "wizard",
+        "preferred_mode": "simple",
         "default_domain": "",
         "autosave_enabled": "true",
         "font_size": "medium",
@@ -478,6 +478,17 @@ def list_entries(filters=None, sort="newest", limit=50, offset=0):
                 (entry["id"],),
             ).fetchone()
             entry["experiment_count"] = exp_count["count"]
+
+            experiments = conn.execute(
+                """
+                SELECT text, status, review_date
+                FROM experiments
+                WHERE entry_id = ?
+                ORDER BY created_at
+            """,
+                (entry["id"],),
+            ).fetchall()
+            entry["experiments"] = [dict(exp) for exp in experiments]
 
         return entries
 

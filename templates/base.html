@@ -10,13 +10,11 @@
 <body class="font-{{ settings.get('font_size', 'medium') }}{% block body_class %}{% endblock %}">
     <header class="header">
         <div class="header-inner{% block header_class %}{% endblock %}">
-            <a href="{{ url_for('index') }}" class="logo">Kolb Cycle</a>
+            <a href="{{ url_for('index') }}" class="logo">Kolbs</a>
             <nav class="nav">
-                <a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>Home</a>
-                <a href="{{ url_for('goals_dashboard') }}" {% if request.endpoint in ['goals_dashboard', 'view_goal', 'new_goal', 'edit_goal', 'goal_daily_log'] %}class="active"{% endif %}>Goals</a>
                 <a href="{{ url_for('list_entries') }}" {% if request.endpoint == 'list_entries' %}class="active"{% endif %}>Entries</a>
+                <a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>New</a>
                 <a href="{{ url_for('list_experiments') }}" {% if request.endpoint == 'list_experiments' %}class="active"{% endif %}>Experiments</a>
-                <a href="{{ url_for('export_page') }}" {% if request.endpoint == 'export_page' %}class="active"{% endif %}>Export</a>
                 <a href="{{ url_for('settings_page') }}" {% if request.endpoint == 'settings_page' %}class="active"{% endif %}>Settings</a>
             </nav>
         </div>

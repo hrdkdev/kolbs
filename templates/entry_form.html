@@ -3,54 +3,39 @@
 {% block title %}{% if is_new %}New Entry{% else %}{{ entry.title or 'Untitled Entry' }}{% endif %} - Kolb's Learning Cycle{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="flex-between mb-md">
-        <div class="flex-center gap-md">
-            <a href="{{ url_for('index') }}" class="btn btn-ghost">&larr; Back</a>
-            <h1 class="mb-0">{% if is_new %}New Entry{% else %}Edit Entry{% endif %}</h1>
-        </div>
-        <div class="flex-center gap-sm">
-            <div class="save-indicator" id="save-indicator">
-                <span id="save-status"></span>
-            </div>
+{% set experience_done = entry.experience_text or (entry.title and entry.domain and entry.occurred_at) %}
+{% set reflection_done = entry.reflection_text or entry.reflection_prompts %}
+{% set abstraction_done = entry.abstraction_text or entry.abstraction_prompts %}
+{% set experiment_done = (entry.experiments and entry.experiments|length > 0) or entry.no_experiment_needed %}
+
+<div class="container container-wide minimal-stack">
+    <div class="entries-page-top">
+        <h1>{% if is_new %}New Entry{% else %}Edit Entry{% endif %}</h1>
+        <div class="simple-entry-status">
+            <a href="{{ url_for('index') }}" class="btn btn-ghost">Back</a>
+            <div class="save-indicator" id="save-indicator"><span id="save-status"></span></div>
             {% if not is_new %}
-            <span class="chip {% if entry.completion == 100 %}chip-complete{% else %}chip-draft{% endif %}" id="completion-chip">
-                {% if entry.completion == 100 %}Complete{% else %}Draft{% endif %}
-            </span>
+            <span class="text-sm text-muted" id="completion-chip">{{ entry.completion }}%</span>
             {% endif %}
         </div>
     </div>
 
-    <form id="entry-form" method="POST" 
+    <form id="entry-form" method="POST"
           action="{% if is_new %}{{ url_for('create_entry_form') }}{% else %}{{ url_for('update_entry_form', entry_id=entry.id) }}{% endif %}">
-        
         <input type="hidden" name="current_step" id="current_step" value="{{ entry.current_step or 1 }}">
-        <input type="hidden" name="reflection_prompts" id="reflection_prompts_json" value="{}">
-        <input type="hidden" name="abstraction_prompts" id="abstraction_prompts_json" value="{}">
+        <input type="hidden" name="occurred_at" id="occurred_at" value="{{ (entry.occurred_at or now.isoformat())[:16] }}">
+        <input type="hidden" name="reflection_prompts" id="reflection_prompts_json" value='{{ (entry.reflection_prompts or {}) | tojson | forceescape }}'>
+        <input type="hidden" name="abstraction_prompts" id="abstraction_prompts_json" value='{{ (entry.abstraction_prompts or {}) | tojson | forceescape }}'>
 
-        {# ===== Title + Metadata Row ===== #}
-        <div class="entry-header-row">
-            <input type="text" class="entry-title-input" id="title" name="title" 
-                   value="{{ entry.title or '' }}" placeholder="What happened?" autofocus>
-            <input type="hidden" id="occurred_at" name="occurred_at"
-                   value="{{ (entry.occurred_at or now.isoformat())[:16] }}">
-        </div>
-
-        {# Collapsible details #}
-        <div class="entry-details-toggle" id="details-toggle">
-            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleDetails()">
-                <span id="details-arrow">▸</span> Details
-                <span class="text-muted text-sm">
-                    {% if entry.domain %}{{ entry.domain }}{% endif %}
-                    {% if entry.valence and entry.valence != 'neutral' %} · {{ entry.valence }}{% endif %}
-                    {% if entry.tags %} · {{ entry.tags|length }} tag{{ 's' if entry.tags|length != 1 }}{% endif %}
-                </span>
-            </button>
-        </div>
-        <div class="entry-details-panel hidden" id="details-panel">
-            <div class="form-row">
+        <div class="card minimal-card">
+            <div class="summary-grid">
                 <div class="form-group">
-                    <label class="form-label" for="occurred_at_visible">Date/Time</label>
+                    <label class="form-label" for="title">Title</label>
+                    <input type="text" class="form-input" id="title" name="title"
+                           value="{{ entry.title or '' }}" placeholder="What happened?" autofocus>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="occurred_at_visible">When</label>
                     <input type="datetime-local" class="form-input" id="occurred_at_visible"
                            value="{{ (entry.occurred_at or now.isoformat())[:16] }}"
                            onchange="document.getElementById('occurred_at').value=this.value">
@@ -58,8 +43,7 @@
                 <div class="form-group">
                     <label class="form-label" for="domain">Domain</label>
                     <input type="text" class="form-input" id="domain" name="domain" list="domain-list"
-                           value="{{ entry.domain or settings.default_domain or '' }}" 
-                           placeholder="e.g., work, study, health...">
+                           value="{{ entry.domain or settings.default_domain or '' }}">
                     <datalist id="domain-list">
                         {% for d in domains %}
                         <option value="{{ d }}">
@@ -68,291 +52,110 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Valence</label>
-                    <div class="form-inline" style="height: 42px;">
-                        <label class="form-check">
-                            <input type="radio" name="valence" value="positive" 
-                                   {% if entry.valence == 'positive' %}checked{% endif %}>
-                            <span class="valence-indicator valence-positive"></span> +
-                        </label>
-                        <label class="form-check">
-                            <input type="radio" name="valence" value="neutral" 
-                                   {% if entry.valence == 'neutral' or not entry.valence %}checked{% endif %}>
-                            <span class="valence-indicator valence-neutral"></span> ~
-                        </label>
-                        <label class="form-check">
-                            <input type="radio" name="valence" value="negative" 
-                                   {% if entry.valence == 'negative' %}checked{% endif %}>
-                            <span class="valence-indicator valence-negative"></span> -
-                        </label>
+                    <div class="minimal-inline-options">
+                        <label><input type="radio" name="valence" value="positive" {% if entry.valence == 'positive' %}checked{% endif %}> positive</label>
+                        <label><input type="radio" name="valence" value="neutral" {% if entry.valence == 'neutral' or not entry.valence %}checked{% endif %}> neutral</label>
+                        <label><input type="radio" name="valence" value="negative" {% if entry.valence == 'negative' %}checked{% endif %}> tough</label>
                     </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label class="form-label" for="tags">Tags</label>
-                <input type="text" class="form-input" id="tags" name="tags"
-                       value="{% if entry.tags %}{% for t in entry.tags %}{{ t.name if t is mapping else t }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}"
-                       placeholder="Comma-separated tags...">
-            </div>
-            {% if available_experiments %}
-            <div class="form-group">
-                <label class="form-check">
-                    <input type="checkbox" id="toggle-reflect-exp" 
-                           {% if entry.reflects_on_experiment_id %}checked{% endif %}>
-                    <span>This reflects on a previous experiment</span>
-                </label>
-            </div>
-            <div class="form-group {% if not entry.reflects_on_experiment_id %}hidden{% endif %}" id="reflect-exp-group">
-                <label class="form-label" for="reflects_on_experiment_id">Which experiment?</label>
-                <select class="form-select" id="reflects_on_experiment_id" name="reflects_on_experiment_id">
-                    <option value="">Select an experiment...</option>
-                    {% for exp in available_experiments %}
-                    <option value="{{ exp.id }}" 
-                            {% if entry.reflects_on_experiment_id == exp.id %}selected{% endif %}>
-                        {{ exp.text[:60] }}... (from: {{ exp.entry_title }})
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-        </div>
 
-        {# ===== The 4 Stages — All Visible ===== #}
-        <div class="stages-container">
-
-            {# Stage 1: Experience #}
-            <div class="stage-section" data-stage="1">
-                <div class="stage-header">
-                    <span class="stage-number stage-1">1</span>
-                    <span class="stage-title">Experience</span>
-                    <span class="text-muted text-sm">What happened? (1-5 sentences, just facts)</span>
+            <div class="summary-grid summary-grid-secondary">
+                <div class="form-group">
+                    <label class="form-label" for="tags">Tags</label>
+                    <input type="text" class="form-input" id="tags" name="tags"
+                           value="{% if entry.tags %}{% for tag in entry.tags %}{{ tag.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}">
                 </div>
-                <textarea class="stage-textarea" id="experience_text" name="experience_text" 
-                          placeholder="Describe what happened... e.g., 'Sarah questioned my timeline. I got defensive. Room went quiet.'"
-                          rows="3">{{ entry.experience_text or '' }}</textarea>
-            </div>
-
-            {# Stage 2: Reflection #}
-            <div class="stage-section" data-stage="2">
-                <div class="stage-header">
-                    <span class="stage-number stage-2">2</span>
-                    <span class="stage-title">Reflection</span>
-                    <span class="text-muted text-sm">How did you feel? What did you notice?</span>
-                </div>
-                
-                <div class="prompts-grid">
-                    <div class="prompt-block" data-prompt="feeling">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>How did you feel?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="feeling" placeholder="Describe your emotions...">{{ entry.reflection_prompts.feeling or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="when">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>When did you feel this way?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="when" placeholder="At what moments...">{{ entry.reflection_prompts.when or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="struggles">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>If you struggled, at what points? Were there triggers?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="struggles" placeholder="Identify specific moments...">{{ entry.reflection_prompts.struggles or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="reaction">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>How did you react?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="reaction" placeholder="Your responses and behaviors...">{{ entry.reflection_prompts.reaction or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="others">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>How did others react?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="others" placeholder="What you observed in others...">{{ entry.reflection_prompts.others or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="factors">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>Any factors before the experience (tired, stress, etc.)?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="factors" placeholder="Pre-existing conditions...">{{ entry.reflection_prompts.factors or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="chronology">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>Chronology / step-by-step recount</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="chronology" placeholder="What happened first, then...">{{ entry.reflection_prompts.chronology or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="difficulty">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>How did you respond to difficulty?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="difficulty" placeholder="Your coping strategies...">{{ entry.reflection_prompts.difficulty or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="timeline">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>How did you feel before/during/after?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="timeline" placeholder="Emotional timeline...">{{ entry.reflection_prompts.timeline or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <textarea class="stage-textarea" id="reflection_text" name="reflection_text"
-                          placeholder="Combine your thoughts here... use bullet points or free-write."
-                          rows="3">{{ entry.reflection_text or '' }}</textarea>
-            </div>
-
-            {# Stage 3: Abstraction #}
-            <div class="stage-section" data-stage="3">
-                <div class="stage-header">
-                    <span class="stage-number stage-3">3</span>
-                    <span class="stage-title">Abstraction</span>
-                    <span class="text-muted text-sm">"I tend to X when Y happens"</span>
-                </div>
-
-                <div class="prompts-grid">
-                    <div class="prompt-block" data-prompt="tendency">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>How do I tend to act in these situations?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="tendency" placeholder="Your typical patterns...">{{ entry.abstraction_prompts.tendency or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="approach">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>What about my approach made me prone to this?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="approach" placeholder="Root causes in your approach...">{{ entry.abstraction_prompts.approach or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="similar">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>Do I make similar mistakes in other areas?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="similar" placeholder="Cross-domain patterns...">{{ entry.abstraction_prompts.similar or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="prompt-block" data-prompt="habits">
-                        <div class="prompt-header" onclick="togglePrompt(this.parentElement)">
-                            <input type="checkbox" class="prompt-check" onclick="event.stopPropagation()">
-                            <span>What habits do I have in these situations?</span>
-                        </div>
-                        <div class="prompt-content">
-                            <textarea class="prompt-textarea" data-prompt-name="habits" placeholder="Habitual responses...">{{ entry.abstraction_prompts.habits or '' if entry else '' }}</textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <textarea class="stage-textarea" id="abstraction_text" name="abstraction_text"
-                          placeholder="What general insights or principles emerge?"
-                          rows="3">{{ entry.abstraction_text or '' }}</textarea>
-            </div>
-
-            {# Stage 4: Experimentation #}
-            <div class="stage-section" data-stage="4">
-                <div class="stage-header">
-                    <span class="stage-number stage-4">4</span>
-                    <span class="stage-title">Experiment</span>
-                    <span class="text-muted text-sm">One specific action to try</span>
-                </div>
-
-                <div class="form-group mb-sm">
-                    <label class="form-check">
-                        <input type="checkbox" name="no_experiment_needed" id="no_experiment_needed"
-                               {% if entry.no_experiment_needed %}checked{% endif %}>
-                        <span class="text-sm text-muted">No experiment needed for this entry</span>
-                    </label>
-                </div>
-
-                <div id="experiments-section" {% if entry.no_experiment_needed %}class="hidden"{% endif %}>
-                    {% if not is_new and entry.experiments %}
-                    {% for exp in entry.experiments %}
-                    <div class="experiment-row" data-exp-id="{{ exp.id }}">
-                        <div class="experiment-row-text">{{ exp.text }}</div>
-                        <div class="experiment-row-meta">
-                            <span class="chip chip-{{ exp.status }}">{{ exp.status }}</span>
-                            {% if exp.start_date %}<span class="text-sm text-muted">Start: {{ exp.start_date }}</span>{% endif %}
-                            {% if exp.review_date %}<span class="text-sm text-muted">Review: {{ exp.review_date }}</span>{% endif %}
-                        </div>
-                        {% if exp.outcome_notes %}
-                        <div class="text-sm text-muted mt-sm">Outcome: {{ exp.outcome_notes }}</div>
-                        {% endif %}
-                        <div class="experiment-row-actions">
-                            <button type="button" class="btn btn-ghost btn-sm" onclick="editExperiment({{ exp.id }})">Edit</button>
-                            <button type="submit" form="delete-exp-form-{{ exp.id }}" class="btn btn-ghost btn-sm text-error" onclick="return confirm('Delete?')">×</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
-
-                    <div class="experiment-add-row" id="experiment-add-row">
-                        {% if is_new %}
-                        <p class="text-sm text-muted" id="save-first-msg">Save to add experiments, or just type above and save — you can add experiments after.</p>
-                        {% else %}
-                        <div class="flex-center gap-sm">
-                            <input type="text" class="form-input" id="quick-exp-text" 
-                                   placeholder="When [trigger], I will [specific action]...">
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="quickAddExperiment()">Add</button>
-                        </div>
-                        {% endif %}
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="reflects_on_experiment_id">Experiment link</label>
+                    <select class="form-select" id="reflects_on_experiment_id" name="reflects_on_experiment_id">
+                        <option value="">None</option>
+                        {% for exp in available_experiments %}
+                        <option value="{{ exp.id }}" {% if entry.reflects_on_experiment_id == exp.id %}selected{% endif %}>
+                            {{ exp.text[:72] }}{% if exp.text|length > 72 %}...{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
         </div>
 
-        {# ===== Bottom Actions ===== #}
-        <div class="entry-actions-bar">
+        <div class="card minimal-card">
+            <table class="worksheet-table minimal-table">
+                <tbody>
+                    <tr class="{% if experience_done %}is-done{% endif %}">
+                        <td class="worksheet-col-stage">1. Experience</td>
+                        <td><textarea class="form-textarea worksheet-textarea" id="experience_text" name="experience_text" rows="4">{{ entry.experience_text or '' }}</textarea></td>
+                        <td class="worksheet-col-done"><span class="stage-check {% if experience_done %}done{% endif %}">{% if experience_done %}done{% else %}-{% endif %}</span></td>
+                    </tr>
+                    <tr class="{% if reflection_done %}is-done{% endif %}">
+                        <td class="worksheet-col-stage">2. Reflection</td>
+                        <td><textarea class="form-textarea worksheet-textarea" id="reflection_text" name="reflection_text" rows="4">{{ entry.reflection_text or '' }}</textarea></td>
+                        <td class="worksheet-col-done"><span class="stage-check {% if reflection_done %}done{% endif %}">{% if reflection_done %}done{% else %}-{% endif %}</span></td>
+                    </tr>
+                    <tr class="{% if abstraction_done %}is-done{% endif %}">
+                        <td class="worksheet-col-stage">3. Pattern</td>
+                        <td><textarea class="form-textarea worksheet-textarea" id="abstraction_text" name="abstraction_text" rows="4">{{ entry.abstraction_text or '' }}</textarea></td>
+                        <td class="worksheet-col-done"><span class="stage-check {% if abstraction_done %}done{% endif %}">{% if abstraction_done %}done{% else %}-{% endif %}</span></td>
+                    </tr>
+                    <tr class="{% if experiment_done %}is-done{% endif %}">
+                        <td class="worksheet-col-stage">4. Experiment</td>
+                        <td>
+                            <div class="worksheet-experiment-cell">
+                                <label class="form-check">
+                                    <input type="checkbox" name="no_experiment_needed" id="no_experiment_needed" {% if entry.no_experiment_needed %}checked{% endif %}>
+                                    <span>No experiment needed</span>
+                                </label>
+                                <div id="experiments-section" class="{% if entry.no_experiment_needed %}hidden{% endif %}">
+                                    {% if is_new %}
+                                    <p class="text-sm text-muted" id="save-first-msg">Save first or start typing above.</p>
+                                    {% else %}
+                                    <div class="quick-experiment-row">
+                                        <input type="text" class="form-input" id="quick-exp-text" placeholder="When X happens, I will do Y">
+                                        <button type="button" class="btn btn-secondary" onclick="quickAddExperiment()">Add</button>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if not is_new and entry.experiments %}
+                                    <div class="subtable-wrap mt-md">
+                                        <table class="table compact-table">
+                                            <tbody>
+                                                {% for exp in entry.experiments %}
+                                                <tr data-exp-id="{{ exp.id }}"
+                                                    data-exp-status="{{ exp.status }}"
+                                                    data-exp-review="{{ exp.review_date or '' }}"
+                                                    data-exp-outcome="{{ exp.outcome_notes or '' }}">
+                                                    <td class="experiment-row-text">{{ exp.text }}</td>
+                                                    <td>{{ exp.status }}</td>
+                                                    <td>{{ exp.review_date or '-' }}</td>
+                                                    <td>
+                                                        <div class="btn-group">
+                                                            <button type="button" class="btn btn-ghost btn-sm" onclick="editExperiment({{ exp.id }})">Edit</button>
+                                                            <button type="submit" form="delete-exp-form-{{ exp.id }}" class="btn btn-ghost btn-sm text-error" onclick="return confirm('Delete this experiment?')">Delete</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="worksheet-col-done"><span class="stage-check {% if experiment_done %}done{% endif %}">{% if experiment_done %}done{% else %}-{% endif %}</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="entry-actions-bar simple-entry-actions">
             <div>
                 {% if not is_new %}
                 <button type="submit" form="delete-entry-form" class="btn btn-ghost text-error btn-sm" onclick="return confirm('Delete this entry?')">Delete</button>
                 {% endif %}
             </div>
-            <div class="btn-group">
-                <button type="submit" name="action" value="save" class="btn btn-primary">Save</button>
-            </div>
+            <button type="submit" name="action" value="save" class="btn btn-primary">Save</button>
         </div>
     </form>
 </div>
@@ -366,10 +169,9 @@
 {% endif %}
 {% endif %}
 
-<!-- Edit Experiment Modal -->
-<div id="exp-modal" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:1000;">
-    <div class="card" style="width:500px;max-width:90%;">
-        <h3>Edit Experiment</h3>
+<div id="exp-modal" class="hidden simple-modal-backdrop">
+    <div class="card simple-modal-card">
+        <h3>Edit experiment</h3>
         <form id="edit-exp-form" method="POST">
             <input type="hidden" name="referrer" value="{{ request.url }}">
             <div class="form-group">
@@ -387,13 +189,13 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Review Date</label>
+                    <label class="form-label">Review</label>
                     <input type="date" class="form-input" name="review_date" id="modal-exp-review">
                 </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Outcome Notes</label>
-                <textarea class="form-textarea" name="outcome_notes" id="modal-exp-outcome" placeholder="What happened?"></textarea>
+                <label class="form-label">Outcome</label>
+                <textarea class="form-textarea" name="outcome_notes" id="modal-exp-outcome"></textarea>
             </div>
             <div class="btn-group">
                 <button type="button" class="btn btn-secondary" onclick="closeExpModal()">Cancel</button>
@@ -409,77 +211,28 @@
 const entryId = {{ entry.id if entry.id else 'null' }};
 let currentEntryId = entryId;
 const isNew = {{ 'true' if is_new else 'false' }};
-// Always autosave for existing entries
-const autosaveEnabled = true;
+const autosaveEnabled = {{ 'true' if settings.autosave_enabled == 'true' else 'false' }};
 
-// Details panel toggle
-function toggleDetails() {
-    const panel = document.getElementById('details-panel');
-    const arrow = document.getElementById('details-arrow');
-    panel.classList.toggle('hidden');
-    arrow.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
-}
-
-// Prompt toggles
-function togglePrompt(block) {
-    block.classList.toggle('open');
-    const checkbox = block.querySelector('.prompt-check');
-    if (checkbox) {
-        checkbox.checked = block.classList.contains('open');
-    }
-}
-
-// Serialize prompt responses before submit
 function serializePromptResponses() {
-    const reflectionPrompts = {};
-    document.querySelectorAll('.stage-section[data-stage="2"] .prompt-textarea[data-prompt-name]').forEach(textarea => {
-        const promptName = textarea.getAttribute('data-prompt-name');
-        const value = textarea.value.trim();
-        if (promptName && value) {
-            reflectionPrompts[promptName] = value;
-        }
-    });
-
-    const abstractionPrompts = {};
-    document.querySelectorAll('.stage-section[data-stage="3"] .prompt-textarea[data-prompt-name]').forEach(textarea => {
-        const promptName = textarea.getAttribute('data-prompt-name');
-        const value = textarea.value.trim();
-        if (promptName && value) {
-            abstractionPrompts[promptName] = value;
-        }
-    });
-
-    document.getElementById('reflection_prompts_json').value = JSON.stringify(reflectionPrompts);
-    document.getElementById('abstraction_prompts_json').value = JSON.stringify(abstractionPrompts);
+    const reflectionInput = document.getElementById('reflection_prompts_json');
+    const abstractionInput = document.getElementById('abstraction_prompts_json');
+    if (reflectionInput && !reflectionInput.value) reflectionInput.value = '{}';
+    if (abstractionInput && !abstractionInput.value) abstractionInput.value = '{}';
 }
 
 document.getElementById('entry-form')?.addEventListener('submit', serializePromptResponses);
 
-// Toggle experiment reflection
-document.getElementById('toggle-reflect-exp')?.addEventListener('change', function() {
-    document.getElementById('reflect-exp-group').classList.toggle('hidden', !this.checked);
-    if (!this.checked) {
-        document.getElementById('reflects_on_experiment_id').value = '';
-    }
-});
-
-// Toggle no experiment needed
 document.getElementById('no_experiment_needed')?.addEventListener('change', function() {
-    document.getElementById('experiments-section').classList.toggle('hidden', this.checked);
+    document.getElementById('experiments-section')?.classList.toggle('hidden', this.checked);
 });
 
-// Auto-create entry on first meaningful input (for new entries)
 let autoCreateTriggered = false;
 async function autoCreateEntry() {
     if (!isNew || autoCreateTriggered || currentEntryId) return;
-    
     const title = document.getElementById('title').value.trim();
     const experience = document.getElementById('experience_text').value.trim();
-    
     if (!title && !experience) return;
-    
     autoCreateTriggered = true;
-    
     const data = {
         title: title,
         experience_text: experience,
@@ -487,7 +240,6 @@ async function autoCreateEntry() {
         domain: document.getElementById('domain')?.value || '',
         valence: document.querySelector('input[name="valence"]:checked')?.value || 'neutral'
     };
-    
     try {
         const response = await fetch('/api/entry', {
             method: 'POST',
@@ -497,20 +249,18 @@ async function autoCreateEntry() {
         const result = await response.json();
         if (result.success) {
             currentEntryId = result.id;
-            // Update form action to use update URL
             document.getElementById('entry-form').action = `/entry/${currentEntryId}/update`;
-            // Update URL without reload
             history.replaceState({}, '', `/entry/${currentEntryId}`);
-            // Show experiment input
             const saveMsg = document.getElementById('save-first-msg');
             if (saveMsg) {
-                saveMsg.outerHTML = `<div class="flex-center gap-sm">
-                    <input type="text" class="form-input" id="quick-exp-text" 
-                           placeholder="When [trigger], I will [specific action]...">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="quickAddExperiment()">Add</button>
+                saveMsg.outerHTML = `<div class="quick-experiment-row">
+                    <input type="text" class="form-input" id="quick-exp-text" placeholder="When X happens, I will do Y">
+                    <button type="button" class="btn btn-secondary" onclick="quickAddExperiment()">Add</button>
                 </div>`;
             }
             showSaveStatus('saved', 'Created');
+        } else {
+            autoCreateTriggered = false;
         }
     } catch (e) {
         autoCreateTriggered = false;
@@ -518,13 +268,11 @@ async function autoCreateEntry() {
     }
 }
 
-// Listen for input on title and experience for auto-create
 if (isNew) {
-    document.getElementById('title').addEventListener('blur', autoCreateEntry);
-    document.getElementById('experience_text').addEventListener('blur', autoCreateEntry);
+    document.getElementById('title')?.addEventListener('blur', autoCreateEntry);
+    document.getElementById('experience_text')?.addEventListener('blur', autoCreateEntry);
 }
 
-// Save status display
 function showSaveStatus(status, message) {
     const indicator = document.getElementById('save-indicator');
     const statusEl = document.getElementById('save-status');
@@ -533,21 +281,18 @@ function showSaveStatus(status, message) {
     statusEl.textContent = message;
     if (status === 'saved') {
         setTimeout(() => {
-            statusEl.textContent = 'Saved ' + new Date().toLocaleTimeString();
+            statusEl.textContent = 'Saved';
         }, 1000);
     }
 }
 
-// Quick add experiment
 function quickAddExperiment() {
     const input = document.getElementById('quick-exp-text');
     if (!input) return;
-    const text = input.value;
-    if (!text.trim()) return;
-    
+    const text = input.value.trim();
+    if (!text) return;
     const id = currentEntryId || entryId;
     if (!id) return;
-    
     fetch(`/api/entry/${id}/experiment`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -555,23 +300,21 @@ function quickAddExperiment() {
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            location.reload();
-        }
+        if (data.success) location.reload();
     });
 }
 
-// Edit experiment modal
 function editExperiment(expId) {
     const modal = document.getElementById('exp-modal');
     const form = document.getElementById('edit-exp-form');
     form.action = `/experiment/${expId}/update`;
-    
     const item = document.querySelector(`[data-exp-id="${expId}"]`);
     if (item) {
-        document.getElementById('modal-exp-text').value = item.querySelector('.experiment-row-text').textContent;
+        document.getElementById('modal-exp-text').value = item.querySelector('.experiment-row-text')?.textContent.trim() || '';
+        document.getElementById('modal-exp-status').value = item.dataset.expStatus || 'planned';
+        document.getElementById('modal-exp-review').value = item.dataset.expReview || '';
+        document.getElementById('modal-exp-outcome').value = item.dataset.expOutcome || '';
     }
-    
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
 }
@@ -586,29 +329,13 @@ document.getElementById('exp-modal')?.addEventListener('click', function(e) {
     if (e.target === this) closeExpModal();
 });
 
-// Auto-expand prompts that already have content
-document.querySelectorAll('.prompt-textarea[data-prompt-name]').forEach(textarea => {
-    if (textarea.value.trim()) {
-        const promptBlock = textarea.closest('.prompt-block');
-        if (promptBlock) {
-            promptBlock.classList.add('open');
-            const checkbox = promptBlock.querySelector('.prompt-check');
-            if (checkbox) checkbox.checked = true;
-        }
-    }
-});
-
-// Auto-growing textareas
-document.querySelectorAll('.stage-textarea, .prompt-textarea').forEach(textarea => {
+document.querySelectorAll('.worksheet-textarea').forEach(textarea => {
     function autoGrow() {
         textarea.style.height = 'auto';
         textarea.style.height = textarea.scrollHeight + 'px';
     }
     textarea.addEventListener('input', autoGrow);
-    // Initial size
-    if (textarea.value) {
-        autoGrow();
-    }
+    if (textarea.value) autoGrow();
 });
 </script>
 {% endblock %}

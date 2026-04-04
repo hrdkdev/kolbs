@@ -67,23 +67,27 @@ def get_filters_from_request():
 def index():
     """Home dashboard."""
     # Get recent entries (no status filtering)
-    recent_entries = db.list_entries(limit=10)
+    recent_entries = db.list_entries(limit=20)
     for entry in recent_entries:
         entry["completion"] = db.calculate_completion(entry)
 
     active_experiments = db.get_active_experiments()
+    latest_draft = db.get_latest_draft()
+    if latest_draft:
+        latest_draft["completion"] = db.calculate_completion(latest_draft)
 
     return render_template(
         "index.html",
         recent_entries=recent_entries,
         active_experiments=active_experiments,
+        latest_draft=latest_draft,
     )
 
 
 @app.route("/new")
 def new_entry():
     """Create new entry page."""
-    mode = request.args.get("mode", db.get_setting("preferred_mode", "wizard"))
+    mode = request.args.get("mode", db.get_setting("preferred_mode", "simple"))
     quick = request.args.get("quick") == "1"
     from_experiment = request.args.get("from_experiment")
 
@@ -123,7 +127,7 @@ def view_entry(entry_id):
         flash("Entry not found", "error")
         return redirect(url_for("index"))
 
-    mode = request.args.get("mode", db.get_setting("preferred_mode", "wizard"))
+    mode = request.args.get("mode", db.get_setting("preferred_mode", "simple"))
     entry["completion"] = db.calculate_completion(entry)
     entry["missing_steps"] = db.get_missing_steps(entry)
 
@@ -272,7 +276,7 @@ def export_all_zip():
 def settings_page():
     """Settings page."""
     if request.method == "POST":
-        db.set_setting("preferred_mode", request.form.get("preferred_mode", "wizard"))
+        db.set_setting("preferred_mode", request.form.get("preferred_mode", "simple"))
         db.set_setting("default_domain", request.form.get("default_domain", ""))
         db.set_setting(
             "autosave_enabled", request.form.get("autosave_enabled", "false")

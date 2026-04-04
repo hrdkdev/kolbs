@@ -14,14 +14,14 @@
         <div class="form-group">
             <label class="form-label">Preferred Mode</label>
             <select name="preferred_mode" class="form-select" style="max-width: 300px;">
-                <option value="wizard" {% if settings.preferred_mode == 'wizard' %}selected{% endif %}>
-                    Wizard (step-by-step)
+                <option value="simple" {% if settings.preferred_mode in ['simple', 'wizard'] %}selected{% endif %}>
+                    Simple table
                 </option>
                 <option value="power" {% if settings.preferred_mode == 'power' %}selected{% endif %}>
-                    Power (all steps on one page)
+                    Full page
                 </option>
             </select>
-            <div class="form-hint">Which mode to use when creating/editing entries</div>
+            <div class="form-hint">Default entry layout. The simplified table is the low-friction option.</div>
         </div>
 
         <div class="form-group">
@@ -99,7 +99,7 @@
                 </tr>
                 <tr>
                     <td><span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></td>
-                    <td>Go to next step (wizard mode)</td>
+                    <td>Reserved shortcut from the older wizard flow</td>
                 </tr>
                 <tr>
                     <td><span class="kbd">/</span></td>
