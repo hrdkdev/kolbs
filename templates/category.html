@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}{{ category.name }} - Kolb's Learning Cycle{% endblock %}
+
+{% block content %}
+<div class="container container-wide minimal-stack">
+    <div class="category-header">
+        <div class="category-header-back">
+            <a href="{{ url_for('index') }}" class="btn btn-ghost btn-sm">← Back</a>
+        </div>
+        <div class="category-header-main">
+            <h1>{{ category.name }}</h1>
+            <span class="text-sm text-muted">{{ total }} cycle{{ 's' if total != 1 else '' }}</span>
+        </div>
+        <div class="minimal-actions">
+            {% if is_uncategorized is not defined or not is_uncategorized %}
+            <a href="{{ url_for('new_entry', category=category.id) }}" class="btn btn-primary">New entry</a>
+            {% else %}
+            <a href="{{ url_for('new_entry') }}" class="btn btn-primary">New entry</a>
+            {% endif %}
+            {% if latest_draft %}
+            <a href="{{ url_for('view_entry', entry_id=latest_draft.id) }}" class="btn btn-secondary">Resume draft</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if entries %}
+    <div class="card">
+        <div class="table-scroll">
+            <table class="table cycles-table">
+                <thead>
+                    <tr>
+                        <th class="cycles-col-meta">Cycle</th>
+                        <th>Experience</th>
+                        <th>Reflection</th>
+                        <th>Abstraction</th>
+                        <th>Experiment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td class="cycles-col-meta">
+                            <div class="cycle-meta">
+                                <a href="{{ url_for('view_entry', entry_id=entry.id) }}" class="cycle-title">
+                                    {{ entry.title or 'Untitled' }}
+                                </a>
+                                <div class="cycle-meta-line">
+                                    <span>{{ entry.occurred_at[:10] if entry.occurred_at else '-' }}</span>
+                                </div>
+                                <div class="cycle-meta-line">
+                                    <span>{{ entry.completion }}%</span>
+                                    {% if latest_draft and latest_draft.id == entry.id %}
+                                    <span>draft</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cycle-cell {% if not entry.experience_text %}is-empty{% endif %}">{{ entry.experience_text|trim if entry.experience_text else 'Empty' }}</div>
+                        </td>
+                        <td>
+                            <div class="cycle-cell {% if not entry.reflection_text and not entry.reflection_prompts %}is-empty{% endif %}">{% if entry.reflection_text %}{{ entry.reflection_text|trim }}{% elif entry.reflection_prompts %}Prompt notes saved{% else %}Empty{% endif %}</div>
+                        </td>
+                        <td>
+                            <div class="cycle-cell {% if not entry.abstraction_text and not entry.abstraction_prompts %}is-empty{% endif %}">{% if entry.abstraction_text %}{{ entry.abstraction_text|trim }}{% elif entry.abstraction_prompts %}Prompt notes saved{% else %}Empty{% endif %}</div>
+                        </td>
+                        <td>
+                            <div class="cycle-cell {% if not entry.experiments and not entry.no_experiment_needed %}is-empty{% endif %}">
+                                {% if entry.experiments %}
+                                    {% for exp in entry.experiments[:3] %}
+                                        {{ exp.text|trim }}{% if exp.review_date %} ({{ exp.review_date }}){% endif %}{% if not loop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                    {% if entry.experiments|length > 3 %}<br>+{{ entry.experiments|length - 3 }} more{% endif %}
+                                {% elif entry.no_experiment_needed %}
+                                    No experiment needed
+                                {% else %}
+                                    Empty
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('view_category' if category.id else 'view_uncategorized', category_id=category.id, page=page-1, sort=sort) }}">&larr; Prev</a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <span class="current">{{ p }}</span>
+            {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+            <a href="{{ url_for('view_category' if category.id else 'view_uncategorized', category_id=category.id, page=p, sort=sort) }}">{{ p }}</a>
+            {% elif p == 4 or p == total_pages - 2 %}
+            <span>...</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <a href="{{ url_for('view_category' if category.id else 'view_uncategorized', category_id=category.id, page=page+1, sort=sort) }}">Next &rarr;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📝</div>
+        <div class="empty-state-title">No cycles in this category</div>
+        <div class="empty-state-text">Create an entry to get started.</div>
+        {% if is_uncategorized is not defined or not is_uncategorized %}
+        <a href="{{ url_for('new_entry', category=category.id) }}" class="btn btn-primary">New entry</a>
+        {% else %}
+        <a href="{{ url_for('new_entry') }}" class="btn btn-primary">New entry</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

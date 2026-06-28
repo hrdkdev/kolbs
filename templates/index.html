@@ -7,85 +7,105 @@
     <div class="cycles-topbar">
         <div class="cycles-topbar-main">
             <h1>Cycles</h1>
-            <p class="text-sm text-muted">Each row is one learning cycle.</p>
+            <p class="text-sm text-muted">Organize your learning cycles by category.</p>
         </div>
         <div class="minimal-actions">
             <a href="{{ url_for('new_entry') }}" class="btn btn-primary">New entry</a>
-            {% if latest_draft %}
-            <a href="{{ url_for('view_entry', entry_id=latest_draft.id) }}" class="btn btn-secondary">Resume draft</a>
-            {% endif %}
         </div>
     </div>
 
-    {% if recent_entries %}
-    <div class="card">
-        <div class="table-scroll">
-            <table class="table cycles-table">
-                <thead>
-                    <tr>
-                        <th class="cycles-col-meta">Cycle</th>
-                        <th>Experience</th>
-                        <th>Reflection</th>
-                        <th>Abstraction</th>
-                        <th>Experiment</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in recent_entries %}
-                    <tr>
-                        <td class="cycles-col-meta">
-                            <div class="cycle-meta">
-                                <a href="{{ url_for('view_entry', entry_id=entry.id) }}" class="cycle-title">
-                                    {{ entry.title or 'Untitled' }}
-                                </a>
-                                <div class="cycle-meta-line">
-                                    <span>{{ entry.occurred_at[:10] if entry.occurred_at else '-' }}</span>
-                                    {% if entry.domain %}<span>{{ entry.domain }}</span>{% endif %}
-                                </div>
-                                <div class="cycle-meta-line">
-                                    <span>{{ entry.completion }}%</span>
-                                    {% if latest_draft and latest_draft.id == entry.id %}
-                                    <span>draft</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="cycle-cell {% if not entry.experience_text %}is-empty{% endif %}">{{ entry.experience_text|trim if entry.experience_text else 'Empty' }}</div>
-                        </td>
-                        <td>
-                            <div class="cycle-cell {% if not entry.reflection_text and not entry.reflection_prompts %}is-empty{% endif %}">{% if entry.reflection_text %}{{ entry.reflection_text|trim }}{% elif entry.reflection_prompts %}Prompt notes saved{% else %}Empty{% endif %}</div>
-                        </td>
-                        <td>
-                            <div class="cycle-cell {% if not entry.abstraction_text and not entry.abstraction_prompts %}is-empty{% endif %}">{% if entry.abstraction_text %}{{ entry.abstraction_text|trim }}{% elif entry.abstraction_prompts %}Prompt notes saved{% else %}Empty{% endif %}</div>
-                        </td>
-                        <td>
-                            <div class="cycle-cell {% if not entry.experiments and not entry.no_experiment_needed %}is-empty{% endif %}">
-                                {% if entry.experiments %}
-                                    {% for exp in entry.experiments[:3] %}
-                                        {{ exp.text|trim }}{% if exp.review_date %} ({{ exp.review_date }}){% endif %}{% if not loop.last %}<br>{% endif %}
-                                    {% endfor %}
-                                    {% if entry.experiments|length > 3 %}<br>+{{ entry.experiments|length - 3 }} more{% endif %}
-                                {% elif entry.no_experiment_needed %}
-                                    No experiment needed
-                                {% else %}
-                                    Empty
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    {% if categories or uncategorized_count > 0 %}
+    <div class="category-grid" id="category-grid">
+        {% for cat in categories %}
+        <a href="{{ url_for('view_category', category_id=cat.id) }}" class="category-card">
+            <div class="category-card-body">
+                <div class="category-card-info">
+                    <div class="category-card-name">{{ cat.name }}</div>
+                    <div class="category-card-meta">
+                        <span>{{ cat.entry_count }} cycle{{ 's' if cat.entry_count != 1 else '' }}</span>
+                        {% if cat.last_entry_updated %}
+                        <span>· Updated {{ cat.last_entry_updated[:10] }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="category-card-count">{{ cat.entry_count }}</div>
+        </a>
+        {% endfor %}
+
+        {% if uncategorized_count > 0 %}
+        <a href="{{ url_for('view_uncategorized') }}" class="category-card category-card-uncategorized">
+            <div class="category-card-body">
+                <div class="category-card-info">
+                    <div class="category-card-name">Uncategorized</div>
+                    <div class="category-card-meta">
+                        <span>{{ uncategorized_count }} cycle{{ 's' if uncategorized_count != 1 else '' }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="category-card-count">{{ uncategorized_count }}</div>
+        </a>
+        {% endif %}
     </div>
     {% else %}
     <div class="empty-state">
-        <div class="empty-state-title">No cycles yet</div>
-        <div class="empty-state-text">Create your first entry.</div>
-        <a href="{{ url_for('new_entry') }}" class="btn btn-primary">New entry</a>
+        <div class="empty-state-icon">📂</div>
+        <div class="empty-state-title">No categories yet</div>
+        <div class="empty-state-text">Create a category to organize your learning cycles, then add entries.</div>
     </div>
     {% endif %}
+
+    <!-- Add Category Section -->
+    <div class="card category-manager" id="category-manager">
+        <div class="panel-header">
+            <span>Manage Categories</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleCategoryForm()" id="toggle-cat-btn">+ Add</button>
+        </div>
+
+        <div id="add-category-form" class="category-form-wrap hidden">
+            <form method="POST" action="{{ url_for('create_category_form') }}" class="category-add-form">
+                <input type="text" name="name" class="form-input" placeholder="Category name" required id="new-cat-name">
+                <button type="submit" class="btn btn-primary btn-sm">Create</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="toggleCategoryForm()">Cancel</button>
+            </form>
+        </div>
+
+        {% if categories %}
+        <div class="category-list-manage">
+            {% for cat in categories %}
+            <div class="category-manage-row">
+                <div class="category-manage-info">
+                    <span>{{ cat.name }}</span>
+                    <span class="text-muted text-sm">({{ cat.entry_count }})</span>
+                </div>
+                <div class="category-manage-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="editCategory({{ cat.id }}, '{{ cat.name }}')">Edit</button>
+                    <form method="POST" action="{{ url_for('delete_category_form', category_id=cat.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-ghost btn-sm text-error" onclick="return confirm('Delete category \'{{ cat.name }}\'? Entries will become uncategorized.')">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div id="edit-cat-modal" class="hidden simple-modal-backdrop">
+        <div class="card simple-modal-card">
+            <h3>Edit Category</h3>
+            <form id="edit-cat-form" method="POST">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-input" name="name" id="edit-cat-name" required>
+                </div>
+                <div class="btn-group mt-md">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditCatModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     {% if active_experiments %}
     <div class="card">
@@ -109,4 +129,39 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleCategoryForm() {
+    const form = document.getElementById('add-category-form');
+    const btn = document.getElementById('toggle-cat-btn');
+    form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden')) {
+        document.getElementById('new-cat-name').focus();
+        btn.textContent = '− Hide';
+    } else {
+        btn.textContent = '+ Add';
+    }
+}
+
+function editCategory(id, name) {
+    const modal = document.getElementById('edit-cat-modal');
+    const form = document.getElementById('edit-cat-form');
+    form.action = `/category/${id}/update`;
+    document.getElementById('edit-cat-name').value = name;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+}
+
+function closeEditCatModal() {
+    const modal = document.getElementById('edit-cat-modal');
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+}
+
+document.getElementById('edit-cat-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeEditCatModal();
+});
+</script>
 {% endblock %}

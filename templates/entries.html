@@ -44,6 +44,15 @@
             </select>
         </div>
         <div class="filter-group">
+            <label>Status</label>
+            <select name="status">
+                <option value="">All</option>
+                <option value="draft" {% if filters.status == 'draft' %}selected{% endif %}>Draft</option>
+                <option value="complete" {% if filters.status == 'complete' %}selected{% endif %}>Complete</option>
+                <option value="archived" {% if filters.status == 'archived' %}selected{% endif %}>Archived</option>
+            </select>
+        </div>
+        <div class="filter-group">
             <label>Sort</label>
             <select name="sort">
                 <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest</option>
@@ -73,12 +82,15 @@
                 </thead>
                 <tbody>
                     {% for entry in entries %}
-                    <tr>
+                    <tr class="{% if entry.is_archived %}row-archived{% endif %}">
                         <td>
                             <div class="entry-table-title">
                                 <span class="valence-indicator valence-{{ entry.valence }}"></span>
                                 <div>
                                     <a href="{{ url_for('view_entry', entry_id=entry.id) }}">{{ entry.title or 'Untitled' }}</a>
+                                    {% if entry.is_archived %}
+                                    <span class="badge badge-archived">archived</span>
+                                    {% endif %}
                                     {% if entry.experience_text %}
                                     <div class="text-sm text-muted">{{ entry.experience_text[:90] }}{% if entry.experience_text|length > 90 %}...{% endif %}</div>
                                     {% endif %}
@@ -95,7 +107,18 @@
                             {% endif %}
                         </td>
                         <td>{{ entry.experiment_count }}</td>
-                        <td>{{ entry.completion }}%</td>
+                        <td>
+                            {{ entry.completion }}%
+                            {% if not entry.is_archived %}
+                            <form method="POST" action="{{ url_for('archive_entry', entry_id=entry.id) }}" style="display:inline">
+                                <button type="submit" class="btn btn-ghost btn-sm text-muted" title="Archive">archive</button>
+                            </form>
+                            {% else %}
+                            <form method="POST" action="{{ url_for('unarchive_entry', entry_id=entry.id) }}" style="display:inline">
+                                <button type="submit" class="btn btn-ghost btn-sm" title="Restore">restore</button>
+                            </form>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -106,21 +129,21 @@
     {% if total_pages > 1 %}
     <div class="pagination">
         {% if page > 1 %}
-        <a href="{{ url_for('list_entries', page=page-1, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">&larr; Prev</a>
+        <a href="{{ url_for('list_entries', page=page-1, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, status=filters.status, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">&larr; Prev</a>
         {% endif %}
 
         {% for p in range(1, total_pages + 1) %}
             {% if p == page %}
             <span class="current">{{ p }}</span>
             {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
-            <a href="{{ url_for('list_entries', page=p, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">{{ p }}</a>
+            <a href="{{ url_for('list_entries', page=p, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, status=filters.status, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">{{ p }}</a>
             {% elif p == 4 or p == total_pages - 2 %}
             <span>...</span>
             {% endif %}
         {% endfor %}
 
         {% if page < total_pages %}
-        <a href="{{ url_for('list_entries', page=page+1, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">Next &rarr;</a>
+        <a href="{{ url_for('list_entries', page=page+1, search=filters.search, domain=filters.domain, valence=filters.valence, tag=filters.tag, status=filters.status, date_from=filters.date_from, date_to=filters.date_to, sort=sort) }}">Next &rarr;</a>
         {% endif %}
     </div>
     {% endif %}

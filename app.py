@@ -65,22 +65,16 @@ def get_filters_from_request():
 
 @app.route("/")
 def index():
-    """Home dashboard."""
-    # Get recent entries (no status filtering)
-    recent_entries = db.list_entries(limit=20)
-    for entry in recent_entries:
-        entry["completion"] = db.calculate_completion(entry)
-
+    """Home dashboard - category grid view."""
+    categories = db.list_categories()
+    uncategorized_count = db.get_uncategorized_count()
     active_experiments = db.get_active_experiments()
-    latest_draft = db.get_latest_draft()
-    if latest_draft:
-        latest_draft["completion"] = db.calculate_completion(latest_draft)
 
     return render_template(
         "index.html",
-        recent_entries=recent_entries,
+        categories=categories,
+        uncategorized_count=uncategorized_count,
         active_experiments=active_experiments,
-        latest_draft=latest_draft,
     )
 
 
@@ -103,9 +97,13 @@ def new_entry():
             prefill["reflects_on_experiment"] = exp
             prefill["reflection_prompts"] = {}
             prefill["abstraction_prompts"] = {}
-
-    domains = db.get_all_domains()
     tags = db.get_all_tags()
+    categories = db.list_categories()
+
+    # Pre-fill category if specified
+    from_category = request.args.get("category")
+    if from_category and not prefill.get("category_id"):
+        prefill["category_id"] = int(from_category)
 
     return render_template(
         "entry_form.html",
@@ -113,9 +111,9 @@ def new_entry():
         mode=mode,
         quick=quick,
         is_new=True,
-        domains=domains,
         tags=tags,
         available_experiments=available_experiments,
+        categories=categories,
     )
 
 
@@ -131,18 +129,18 @@ def view_entry(entry_id):
     entry["completion"] = db.calculate_completion(entry)
     entry["missing_steps"] = db.get_missing_steps(entry)
 
-    domains = db.get_all_domains()
     tags = db.get_all_tags()
     available_experiments = db.get_active_experiments()
+    categories = db.list_categories()
 
     return render_template(
         "entry_form.html",
         entry=entry,
         mode=mode,
         is_new=False,
-        domains=domains,
         tags=tags,
         available_experiments=available_experiments,
+        categories=categories,
     )
 
 
@@ -154,6 +152,22 @@ def delete_entry(entry_id):
     return redirect(url_for("index"))
 
 
+@app.route("/entry/<int:entry_id>/archive", methods=["POST"])
+def archive_entry(entry_id):
+    """Archive an entry."""
+    db.archive_entry(entry_id)
+    flash("Entry archived", "success")
+    return redirect(request.referrer or url_for("index"))
+
+
+@app.route("/entry/<int:entry_id>/unarchive", methods=["POST"])
+def unarchive_entry(entry_id):
+    """Unarchive an entry."""
+    db.unarchive_entry(entry_id)
+    flash("Entry restored", "success")
+    return redirect(request.referrer or url_for("index"))
+
+
 @app.route("/entries")
 def list_entries():
     """List all entries with filters."""
@@ -163,13 +177,14 @@ def list_entries():
     per_page = 20
 
     entries = db.list_entries(
-        filters=filters, sort=sort, limit=per_page, offset=(page - 1) * per_page
+        filters=filters, sort=sort, limit=per_page, offset=(page - 1) * per_page,
+        include_archived=True
     )
 
     for entry in entries:
         entry["completion"] = db.calculate_completion(entry)
 
-    total = db.get_entry_count(filters)
+    total = db.get_entry_count(filters, include_archived=True)
     total_pages = (total + per_page - 1) // per_page
 
     domains = db.get_all_domains()
@@ -327,7 +342,6 @@ def create_entry_form():
     data = {
         "title": request.form.get("title", ""),
         "occurred_at": request.form.get("occurred_at", datetime.now().isoformat()),
-        "domain": request.form.get("domain", ""),
         "valence": request.form.get("valence", "neutral"),
         "experience_text": request.form.get("experience_text", ""),
         "reflection_text": request.form.get("reflection_text", ""),
@@ -336,6 +350,7 @@ def create_entry_form():
         "current_step": int(request.form.get("current_step", 1)),
         "reflects_on_experiment_id": request.form.get("reflects_on_experiment_id")
         or None,
+        "category_id": request.form.get("category_id") or None,
     }
 
     # Handle prompt responses from JSON if provided (API calls)
@@ -369,7 +384,6 @@ def update_entry_form(entry_id):
     data = {
         "title": request.form.get("title", ""),
         "occurred_at": request.form.get("occurred_at"),
-        "domain": request.form.get("domain", ""),
         "valence": request.form.get("valence", "neutral"),
         "experience_text": request.form.get("experience_text", ""),
         "reflection_text": request.form.get("reflection_text", ""),
@@ -378,6 +392,7 @@ def update_entry_form(entry_id):
         "current_step": int(request.form.get("current_step", 1)),
         "reflects_on_experiment_id": request.form.get("reflects_on_experiment_id")
         or None,
+        "category_id": request.form.get("category_id") or None,
     }
 
     # Handle prompt responses from JSON if provided (API calls)
@@ -610,6 +625,190 @@ def api_active_experiments():
     """Get active experiments."""
     experiments = db.get_active_experiments()
     return jsonify({"experiments": experiments})
+
+
+# ==========================================
+# Category HTML Routes
+# ==========================================
+
+
+@app.route("/category/<int:category_id>")
+def view_category(category_id):
+    """View cycles in a specific category."""
+    category = db.get_category(category_id)
+    if not category:
+        flash("Category not found", "error")
+        return redirect(url_for("index"))
+
+    filters = get_filters_from_request()
+    filters["category_id"] = category_id
+    sort = request.args.get("sort", "newest")
+    page = int(request.args.get("page", 1))
+    per_page = 20
+
+    entries = db.list_entries(
+        filters=filters, sort=sort, limit=per_page, offset=(page - 1) * per_page
+    )
+    for entry in entries:
+        entry["completion"] = db.calculate_completion(entry)
+
+    total = db.get_entry_count(filters)
+    total_pages = (total + per_page - 1) // per_page
+
+    latest_draft = db.get_latest_draft()
+    if latest_draft:
+        latest_draft["completion"] = db.calculate_completion(latest_draft)
+
+    return render_template(
+        "category.html",
+        category=category,
+        entries=entries,
+        latest_draft=latest_draft,
+        sort=sort,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+    )
+
+
+@app.route("/uncategorized")
+def view_uncategorized():
+    """View cycles with no category."""
+    filters = get_filters_from_request()
+    filters["category_id"] = "uncategorized"
+    sort = request.args.get("sort", "newest")
+    page = int(request.args.get("page", 1))
+    per_page = 20
+
+    entries = db.list_entries(
+        filters=filters, sort=sort, limit=per_page, offset=(page - 1) * per_page
+    )
+    for entry in entries:
+        entry["completion"] = db.calculate_completion(entry)
+
+    total = db.get_entry_count(filters)
+    total_pages = (total + per_page - 1) // per_page
+
+    latest_draft = db.get_latest_draft()
+    if latest_draft:
+        latest_draft["completion"] = db.calculate_completion(latest_draft)
+
+    return render_template(
+        "category.html",
+        category={"id": None, "name": "Uncategorized", "color": "#6b7280"},
+        entries=entries,
+        latest_draft=latest_draft,
+        sort=sort,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        is_uncategorized=True,
+    )
+
+
+@app.route("/category/create", methods=["POST"])
+def create_category_form():
+    """Create category via form submission."""
+    name = request.form.get("name", "").strip()
+
+    if not name:
+        flash("Category name is required", "error")
+        return redirect(url_for("index"))
+
+    try:
+        db.create_category(name, "#6b7280", "")
+        flash(f"Category '{name}' created", "success")
+    except Exception as e:
+        if "UNIQUE" in str(e):
+            flash("A category with that name already exists", "error")
+        else:
+            flash(f"Error creating category: {str(e)}", "error")
+
+    return redirect(url_for("index"))
+
+
+@app.route("/category/<int:category_id>/update", methods=["POST"])
+def update_category_form(category_id):
+    """Update category via form submission."""
+    data = {}
+    if request.form.get("name"):
+        data["name"] = request.form.get("name")
+
+    try:
+        db.update_category(category_id, data)
+        flash("Category updated", "success")
+    except Exception as e:
+        if "UNIQUE" in str(e):
+            flash("A category with that name already exists", "error")
+        else:
+            flash(f"Error updating category: {str(e)}", "error")
+
+    return redirect(request.referrer or url_for("index"))
+
+
+@app.route("/category/<int:category_id>/delete", methods=["POST"])
+def delete_category_form(category_id):
+    """Delete category via form submission."""
+    db.delete_category(category_id)
+    flash("Category deleted. Entries moved to Uncategorized.", "success")
+    return redirect(url_for("index"))
+
+
+# Category API Routes
+
+
+@app.route("/api/category", methods=["POST"])
+def api_create_category():
+    """Create a new category via API."""
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+
+    if not name:
+        return jsonify({"success": False, "error": "Category name required"}), 400
+
+    try:
+        cat_id = db.create_category(name, "#6b7280", "")
+        category = db.get_category(cat_id)
+        return jsonify({"success": True, "category": category, "id": cat_id})
+    except Exception as e:
+        if "UNIQUE" in str(e):
+            return jsonify({"success": False, "error": "Category name already exists"}), 400
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/category/<int:category_id>", methods=["PATCH"])
+def api_update_category(category_id):
+    """Update category via API."""
+    data = request.get_json() or {}
+    category = db.get_category(category_id)
+    if not category:
+        return jsonify({"success": False, "error": "Category not found"}), 404
+
+    try:
+        db.update_category(category_id, data)
+        updated = db.get_category(category_id)
+        return jsonify({"success": True, "category": updated})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/category/<int:category_id>", methods=["DELETE"])
+def api_delete_category(category_id):
+    """Delete category via API."""
+    category = db.get_category(category_id)
+    if not category:
+        return jsonify({"success": False, "error": "Category not found"}), 404
+
+    db.delete_category(category_id)
+    return jsonify({"success": True})
+
+
+@app.route("/api/categories")
+def api_list_categories():
+    """List all categories."""
+    categories = db.list_categories()
+    uncategorized_count = db.get_uncategorized_count()
+    return jsonify({"categories": categories, "uncategorized_count": uncategorized_count})
 
 
 # ==========================================

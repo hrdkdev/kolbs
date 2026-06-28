@@ -36,6 +36,15 @@ def init_db():
     """Create all tables if they don't exist."""
     with get_db() as conn:
         conn.executescript("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                color TEXT DEFAULT '#6b7280',
+                icon TEXT DEFAULT '📁',
+                sort_order INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT DEFAULT '',
@@ -51,9 +60,12 @@ def init_db():
                 abstraction_prompts TEXT DEFAULT '{}',
                 no_experiment_needed INTEGER DEFAULT 0,
                 is_complete INTEGER DEFAULT 0,
+                is_archived INTEGER DEFAULT 0,
                 current_step INTEGER DEFAULT 1,
                 reflects_on_experiment_id INTEGER,
-                FOREIGN KEY (reflects_on_experiment_id) REFERENCES experiments(id) ON DELETE SET NULL
+                category_id INTEGER,
+                FOREIGN KEY (reflects_on_experiment_id) REFERENCES experiments(id) ON DELETE SET NULL,
+                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
             );
 
             CREATE TABLE IF NOT EXISTS experiments (
@@ -156,7 +168,7 @@ def init_db():
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
             );
-
+            CREATE INDEX IF NOT EXISTS idx_entries_is_archived ON entries(is_archived);
             CREATE INDEX IF NOT EXISTS idx_goals_is_archived ON goals(is_archived);
             CREATE INDEX IF NOT EXISTS idx_goal_daily_logs_date ON goal_daily_logs(log_date);
             CREATE INDEX IF NOT EXISTS idx_goal_daily_logs_goal ON goal_daily_logs(goal_id);
@@ -184,6 +196,22 @@ def migrate_db():
             )
             print("Added abstraction_prompts column")
 
+        # Add is_archived column if it doesn't exist
+        if "is_archived" not in columns:
+            conn.execute(
+                "ALTER TABLE entries ADD COLUMN is_archived INTEGER DEFAULT 0"
+            )
+            print("Added is_archived column")
+
+        # Add category_id column if it doesn't exist
+        if "category_id" not in columns:
+            conn.execute(
+                "ALTER TABLE entries ADD COLUMN category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL"
+            )
+            print("Added category_id column")
+
+        # Create category_id index
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_entries_category_id ON entries(category_id)")
 
 def get_setting(key, default=None):
     """Get a setting value."""
@@ -233,13 +261,21 @@ def create_entry(data=None):
     data = data or {}
     now = datetime.now().isoformat()
     with get_db() as conn:
+        # Handle category_id
+        category_id = data.get("category_id")
+        if category_id and str(category_id).strip():
+            category_id = int(category_id)
+        else:
+            category_id = None
+
         cursor = conn.execute(
             """
             INSERT INTO entries (
-                title, occurred_at, created_at, updated_at, domain, valence,
+                title, occurred_at, created_at, updated_at, valence,
                 experience_text, reflection_text, reflection_prompts,
                 abstraction_text, abstraction_prompts,
-                no_experiment_needed, is_complete, current_step, reflects_on_experiment_id
+                no_experiment_needed, is_complete, current_step, reflects_on_experiment_id,
+                category_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
@@ -247,7 +283,6 @@ def create_entry(data=None):
                 data.get("occurred_at", now),
                 now,
                 now,
-                data.get("domain", ""),
                 data.get("valence", "neutral"),
                 data.get("experience_text", ""),
                 data.get("reflection_text", ""),
@@ -261,6 +296,7 @@ def create_entry(data=None):
                 if data.get("reflects_on_experiment_id")
                 and str(data.get("reflects_on_experiment_id")).strip()
                 else None,
+                category_id,
             ),
         )
         return cursor.lastrowid
@@ -339,7 +375,6 @@ def update_entry(entry_id, data):
     allowed_fields = [
         "title",
         "occurred_at",
-        "domain",
         "valence",
         "experience_text",
         "reflection_text",
@@ -348,8 +383,10 @@ def update_entry(entry_id, data):
         "abstraction_prompts",
         "no_experiment_needed",
         "is_complete",
+        "is_archived",
         "current_step",
         "reflects_on_experiment_id",
+        "category_id",
     ]
 
     updates = []
@@ -362,10 +399,14 @@ def update_entry(entry_id, data):
                 value = 1 if value else 0
             elif field == "is_complete":
                 value = 1 if value else 0
+            elif field == "is_archived":
+                value = 1 if value else 0
             elif field in ["reflection_prompts", "abstraction_prompts"]:
                 value = json.dumps(value) if isinstance(value, dict) else value
             elif field == "reflects_on_experiment_id":
                 # Convert empty string to None for foreign key constraint
+                value = int(value) if value and str(value).strip() else None
+            elif field == "category_id":
                 value = int(value) if value and str(value).strip() else None
             values.append(value)
 
@@ -391,11 +432,24 @@ def delete_entry(entry_id):
         conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
 
 
-def list_entries(filters=None, sort="newest", limit=50, offset=0):
+def archive_entry(entry_id):
+    """Archive an entry (soft hide from home page)."""
+    update_entry(entry_id, {"is_archived": True})
+
+
+def unarchive_entry(entry_id):
+    """Unarchive an entry."""
+    update_entry(entry_id, {"is_archived": False})
+
+
+def list_entries(filters=None, sort="newest", limit=50, offset=0, include_archived=False):
     """List entries with optional filters."""
     filters = filters or {}
     query = "SELECT * FROM entries WHERE 1=1"
     params = []
+
+    if not include_archived:
+        query += " AND is_archived = 0"
 
     if filters.get("search"):
         query += """ AND (
@@ -417,6 +471,8 @@ def list_entries(filters=None, sort="newest", limit=50, offset=0):
         query += " AND is_complete = 0"
     elif filters.get("status") == "complete":
         query += " AND is_complete = 1"
+    elif filters.get("status") == "archived":
+        query += " AND is_archived = 1"
 
     if filters.get("has_experiments"):
         query += " AND id IN (SELECT DISTINCT entry_id FROM experiments)"
@@ -442,6 +498,14 @@ def list_entries(filters=None, sort="newest", limit=50, offset=0):
             SELECT entry_id FROM experiments WHERE status = ?
         )"""
         params.append(filters["experiment_status"])
+
+    if "category_id" in filters:
+        cat_id = filters["category_id"]
+        if cat_id is None or cat_id == "" or cat_id == "uncategorized":
+            query += " AND category_id IS NULL"
+        else:
+            query += " AND category_id = ?"
+            params.append(int(cat_id))
 
     # Sorting
     if sort == "oldest":
@@ -493,11 +557,14 @@ def list_entries(filters=None, sort="newest", limit=50, offset=0):
         return entries
 
 
-def get_entry_count(filters=None):
+def get_entry_count(filters=None, include_archived=False):
     """Get total count of entries matching filters."""
     filters = filters or {}
     query = "SELECT COUNT(*) as count FROM entries WHERE 1=1"
     params = []
+
+    if not include_archived:
+        query += " AND is_archived = 0"
 
     if filters.get("search"):
         query += """ AND (
@@ -519,6 +586,16 @@ def get_entry_count(filters=None):
         query += " AND is_complete = 0"
     elif filters.get("status") == "complete":
         query += " AND is_complete = 1"
+    elif filters.get("status") == "archived":
+        query += " AND is_archived = 1"
+
+    if "category_id" in filters:
+        cat_id = filters["category_id"]
+        if cat_id is None or cat_id == "" or cat_id == "uncategorized":
+            query += " AND category_id IS NULL"
+        else:
+            query += " AND category_id = ?"
+            params.append(int(cat_id))
 
     with get_db() as conn:
         result = conn.execute(query, params).fetchone()
@@ -529,7 +606,7 @@ def get_latest_draft():
     """Get the most recently updated incomplete entry."""
     with get_db() as conn:
         entry = conn.execute("""
-            SELECT * FROM entries WHERE is_complete = 0
+            SELECT * FROM entries WHERE is_complete = 0 AND is_archived = 0
             ORDER BY updated_at DESC LIMIT 1
         """).fetchone()
         return dict(entry) if entry else None
@@ -1630,3 +1707,104 @@ def get_goals_dashboard_stats():
             "logs_this_week": logs_this_week,
             "can_create": active_count < 3,
         }
+
+
+# ==========================================
+# Category CRUD operations
+# ==========================================
+
+
+def create_category(name, color="#6b7280", icon="📁"):
+    """Create a new category and return its ID."""
+    name = name.strip()
+    with get_db() as conn:
+        # Get next sort_order
+        max_order = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) as m FROM categories"
+        ).fetchone()["m"]
+
+        cursor = conn.execute(
+            """
+            INSERT INTO categories (name, color, icon, sort_order, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (name, color, icon, max_order + 1, datetime.now().isoformat()),
+        )
+        return cursor.lastrowid
+
+
+def get_category(category_id):
+    """Get a single category by ID."""
+    with get_db() as conn:
+        cat = conn.execute(
+            "SELECT * FROM categories WHERE id = ?", (category_id,)
+        ).fetchone()
+        return dict(cat) if cat else None
+
+
+def update_category(category_id, data):
+    """Update a category with partial data."""
+    allowed_fields = ["name", "color", "icon", "sort_order"]
+    updates = []
+    values = []
+
+    for field in allowed_fields:
+        if field in data:
+            updates.append(f"{field} = ?")
+            value = data[field]
+            if field == "name":
+                value = value.strip()
+            values.append(value)
+
+    if not updates:
+        return
+
+    values.append(category_id)
+
+    with get_db() as conn:
+        conn.execute(
+            f"""
+            UPDATE categories SET {", ".join(updates)} WHERE id = ?
+        """,
+            values,
+        )
+
+
+def delete_category(category_id):
+    """Delete a category. Entries in this category become uncategorized (ON DELETE SET NULL)."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+
+
+def list_categories():
+    """List all categories with entry counts."""
+    with get_db() as conn:
+        categories = conn.execute("""
+            SELECT c.*,
+                   COUNT(e.id) as entry_count,
+                   MAX(e.updated_at) as last_entry_updated
+            FROM categories c
+            LEFT JOIN entries e ON e.category_id = c.id AND e.is_archived = 0
+            GROUP BY c.id
+            ORDER BY c.sort_order ASC, c.name ASC
+        """).fetchall()
+        return [dict(c) for c in categories]
+
+
+def get_uncategorized_count():
+    """Get count of entries with no category."""
+    with get_db() as conn:
+        result = conn.execute(
+            "SELECT COUNT(*) as c FROM entries WHERE category_id IS NULL AND is_archived = 0"
+        ).fetchone()
+        return result["c"]
+
+
+def reorder_categories(id_list):
+    """Update sort_order for categories based on the given ID list."""
+    with get_db() as conn:
+        for i, cat_id in enumerate(id_list):
+            conn.execute(
+                "UPDATE categories SET sort_order = ? WHERE id = ?",
+                (i, cat_id),
+            )

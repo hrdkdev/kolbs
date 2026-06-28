@@ -16,6 +16,9 @@
             <div class="save-indicator" id="save-indicator"><span id="save-status"></span></div>
             {% if not is_new %}
             <span class="text-sm text-muted" id="completion-chip">{{ entry.completion }}%</span>
+            {% if entry.is_archived %}
+            <span class="badge badge-archived">archived</span>
+            {% endif %}
             {% endif %}
         </div>
     </div>
@@ -41,16 +44,6 @@
                            onchange="document.getElementById('occurred_at').value=this.value">
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="domain">Domain</label>
-                    <input type="text" class="form-input" id="domain" name="domain" list="domain-list"
-                           value="{{ entry.domain or settings.default_domain or '' }}">
-                    <datalist id="domain-list">
-                        {% for d in domains %}
-                        <option value="{{ d }}">
-                        {% endfor %}
-                    </datalist>
-                </div>
-                <div class="form-group">
                     <label class="form-label">Valence</label>
                     <div class="minimal-inline-options">
                         <label><input type="radio" name="valence" value="positive" {% if entry.valence == 'positive' %}checked{% endif %}> positive</label>
@@ -61,6 +54,17 @@
             </div>
 
             <div class="summary-grid summary-grid-secondary">
+                <div class="form-group">
+                    <label class="form-label" for="category_id">Category</label>
+                    <select class="form-select" id="category_id" name="category_id">
+                        <option value="">None</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if entry.category_id == cat.id %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="form-group">
                     <label class="form-label" for="tags">Tags</label>
                     <input type="text" class="form-input" id="tags" name="tags"
@@ -153,6 +157,11 @@
             <div>
                 {% if not is_new %}
                 <button type="submit" form="delete-entry-form" class="btn btn-ghost text-error btn-sm" onclick="return confirm('Delete this entry?')">Delete</button>
+                {% if entry.is_archived %}
+                <button type="submit" form="unarchive-entry-form" class="btn btn-ghost btn-sm">Restore</button>
+                {% else %}
+                <button type="submit" form="archive-entry-form" class="btn btn-ghost btn-sm">Archive</button>
+                {% endif %}
                 {% endif %}
             </div>
             <button type="submit" name="action" value="save" class="btn btn-primary">Save</button>
@@ -162,6 +171,8 @@
 
 {% if not is_new %}
 <form id="delete-entry-form" method="POST" action="{{ url_for('delete_entry', entry_id=entry.id) }}" style="display:none;"></form>
+<form id="archive-entry-form" method="POST" action="{{ url_for('archive_entry', entry_id=entry.id) }}" style="display:none;"></form>
+<form id="unarchive-entry-form" method="POST" action="{{ url_for('unarchive_entry', entry_id=entry.id) }}" style="display:none;"></form>
 {% if entry.experiments %}
 {% for exp in entry.experiments %}
 <form id="delete-exp-form-{{ exp.id }}" method="POST" action="{{ url_for('delete_experiment_form', exp_id=exp.id) }}" style="display:none;"></form>
@@ -237,7 +248,6 @@ async function autoCreateEntry() {
         title: title,
         experience_text: experience,
         occurred_at: document.getElementById('occurred_at').value,
-        domain: document.getElementById('domain')?.value || '',
         valence: document.querySelector('input[name="valence"]:checked')?.value || 'neutral'
     };
     try {
