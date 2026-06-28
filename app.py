@@ -303,9 +303,14 @@ def settings_page():
     settings = db.get_all_settings()
     domains = db.get_all_domains()
     db_path = db.get_db_path()
+    categories = db.list_categories()
 
     return render_template(
-        "settings.html", settings=settings, domains=domains, db_path=db_path
+        "settings.html",
+        settings=settings,
+        domains=domains,
+        db_path=db_path,
+        categories=categories,
     )
 
 

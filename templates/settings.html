@@ -60,6 +60,57 @@
 
     <div class="card">
         <div class="card-header">
+            <h2 class="card-title">Manage Categories</h2>
+        </div>
+
+        <div class="form-group">
+            <form method="POST" action="{{ url_for('create_category_form') }}" class="category-add-form">
+                <input type="text" name="name" class="form-input" placeholder="Category name" required id="new-cat-name">
+                <button type="submit" class="btn btn-primary btn-sm">Add Category</button>
+            </form>
+        </div>
+
+        {% if categories %}
+        <div class="category-list-manage">
+            {% for cat in categories %}
+            <div class="category-manage-row">
+                <div class="category-manage-info">
+                    <span>{{ cat.name }}</span>
+                    <span class="text-muted text-sm">({{ cat.entry_count }})</span>
+                </div>
+                <div class="category-manage-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="editCategory({{ cat.id }}, '{{ cat.name }}')">Edit</button>
+                    <form method="POST" action="{{ url_for('delete_category_form', category_id=cat.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-ghost btn-sm text-error" onclick="return confirm('Delete category \'{{ cat.name }}\'? Entries will become uncategorized.')">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted">No categories yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div id="edit-cat-modal" class="hidden simple-modal-backdrop">
+        <div class="card simple-modal-card">
+            <h3>Edit Category</h3>
+            <form id="edit-cat-form" method="POST">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-input" name="name" id="edit-cat-name" required>
+                </div>
+                <div class="btn-group mt-md">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditCatModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
             <h2 class="card-title">Database</h2>
         </div>
 
@@ -113,4 +164,27 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editCategory(id, name) {
+    const modal = document.getElementById('edit-cat-modal');
+    const form = document.getElementById('edit-cat-form');
+    form.action = `/category/${id}/update`;
+    document.getElementById('edit-cat-name').value = name;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+}
+
+function closeEditCatModal() {
+    const modal = document.getElementById('edit-cat-modal');
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+}
+
+document.getElementById('edit-cat-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeEditCatModal();
+});
+</script>
 {% endblock %}
